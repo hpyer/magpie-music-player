@@ -1,0 +1,37 @@
+{
+  "name": "@magpie-music/plugin-types",
+  "version": "1.0.0",
+  "description": "Type definitions for Magpie Music Player plugins.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hpyer/magpie-music-player.git",
+    "directory": "packages/plugin-types"
+  },
+  "bugs": {
+    "url": "https://github.com/hpyer/magpie-music-player/issues"
+  },
+  "homepage": "https://github.com/hpyer/magpie-music-player#readme",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "prepack": "pnpm build"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2"
+  }
+}

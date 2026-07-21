@@ -1,0 +1,18 @@
+{
+  "name": "magpie-music-plugin-navidrome",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../packages/plugin-cli/dist/index.js build",
+    "test": "node ../../packages/plugin-cli/dist/index.js test"
+  },
+  "dependencies": {
+    "@magpie-music/plugin-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@magpie-music/plugin-cli": "workspace:*",
+    "typescript": "~5.6.2"
+  }
+}

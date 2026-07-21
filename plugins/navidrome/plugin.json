@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "cn.hpyer.magpie.navidrome",
+  "name": "Navidrome",
+  "version": "1.0.0",
+  "runtime": "web-worker-esm",
+  "entry": "dist/index.js",
+  "author": "Hpyer",
+  "description": "Navidrome/Subsonic playlist source for Magpie.",
+  "permissions": [
+    "media:playlist",
+    "media:resolve-url",
+    "network:request",
+    "storage:plugin"
+  ],
+  "capabilities": [
+    "playlist-source",
+    "media-url"
+  ],
+  "networkAllowlist": [
+    "user-configured:serverUrl"
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "entry": "492484ff220b41330432e990303985af8bc2af494619c0d4a5f592f4c785133b"
+  }
+}

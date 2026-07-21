@@ -1,0 +1,40 @@
+{
+  "name": "@magpie-music/plugin-cli",
+  "version": "1.0.0",
+  "description": "Command-line tools for creating, testing, and packaging Magpie Music Player plugins.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "magpie-music": "./bin/magpie-music.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hpyer/magpie-music-player.git",
+    "directory": "packages/plugin-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/hpyer/magpie-music-player/issues"
+  },
+  "homepage": "https://github.com/hpyer/magpie-music-player#readme",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "test": "pnpm build && node --test test/*.test.mjs",
+    "prepack": "pnpm build"
+  },
+  "dependencies": {
+    "@magpie-music/plugin-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "~5.6.2"
+  }
+}

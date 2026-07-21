@@ -1,0 +1,15 @@
+{
+  "name": "__PACKAGE_NAME__",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "magpie-music build",
+    "test": "magpie-music test"
+  },
+  "devDependencies": {
+    "@magpie-music/plugin-cli": "^1.0.0",
+    "@magpie-music/plugin-types": "^1.0.0"
+  }
+}

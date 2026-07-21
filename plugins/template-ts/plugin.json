@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "__PLUGIN_ID__",
+  "name": "__PLUGIN_NAME__",
+  "version": "1.0.0",
+  "runtime": "web-worker-esm",
+  "entry": "dist/index.js",
+  "permissions": [],
+  "capabilities": [],
+  "integrity": {
+    "algorithm": "sha256",
+    "entry": ""
+  }
+}
