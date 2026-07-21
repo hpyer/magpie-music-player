@@ -80,7 +80,6 @@ const commandFor = (value) => {
   process.exit(1);
 };
 
-const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 const env = { ...process.env };
 
 if (command === 'windows:cross') {
@@ -89,9 +88,10 @@ if (command === 'windows:cross') {
     || fileURLToPath(new URL('../src-tauri/target/xwin-cache', import.meta.url));
 }
 
-const result = spawnSync(pnpm, ['exec', 'tauri', ...commandFor(command)], {
+const result = spawnSync('pnpm', ['exec', 'tauri', ...commandFor(command)], {
   cwd: new URL('..', import.meta.url),
   env,
+  shell: process.platform === 'win32',
   stdio: 'inherit',
 });
 
