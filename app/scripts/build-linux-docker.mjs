@@ -228,6 +228,8 @@ const dockerArgs = [
   `magpie-music-linux-target-${target.targetDir}:/cargo-target`,
   '-v',
   'magpie-music-linux-tauri-cache:/root/.cache/tauri',
+  '-e',
+  'APPIMAGE_EXTRACT_AND_RUN=1',
   '-w',
   '/workspace',
   builderImage,
