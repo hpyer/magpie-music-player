@@ -84,6 +84,8 @@ const appName = 'MagpieMusicPlayer';
 const appVersion = appPackage.version;
 const appDescription = '一款轻量的桌面音乐播放器，支持本地音乐管理、播放列表、插件扩展、歌词与歌曲信息检索。';
 const STARTUP_STEP_TIMEOUT_MS = 5000;
+const PLUGIN_STARTUP_SYNC_DELAY_MS = 900;
+const PLUGIN_STARTUP_SYNC_IDLE_TIMEOUT_MS = 2500;
 
 const isScanning = ref(false);
 const scanningPlaylistId = ref<string | null>(null);
@@ -168,6 +170,12 @@ let closeAfterPersistTask: Promise<void> | null = null;
 let isPlaybackSessionRestorePending = true;
 let lyricSearchRequestId = 0;
 let songInfoSearchRequestId = 0;
+let cancelPluginStartupSyncSchedule: (() => void) | undefined;
+
+type IdleSchedulerWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 const currentPlaylist = computed(() => playlistStore.currentPlaylist);
 const songs = computed(() => currentPlaylist.value?.songs ?? []);
@@ -391,6 +399,38 @@ const withStartupTimeout = async <T,>(
       window.clearTimeout(timeoutId);
     }
   }
+};
+
+const scheduleStartupBackgroundTask = (task: () => void) => {
+  let idleHandle: number | undefined;
+  let hasRun = false;
+  const idleWindow = window as IdleSchedulerWindow;
+
+  const runOnce = () => {
+    if (hasRun) return;
+    hasRun = true;
+    cancelPluginStartupSyncSchedule = undefined;
+    task();
+  };
+
+  const delayHandle = window.setTimeout(() => {
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      idleHandle = idleWindow.requestIdleCallback(runOnce, {
+        timeout: PLUGIN_STARTUP_SYNC_IDLE_TIMEOUT_MS,
+      });
+      return;
+    }
+
+    runOnce();
+  }, PLUGIN_STARTUP_SYNC_DELAY_MS);
+
+  return () => {
+    window.clearTimeout(delayHandle);
+    if (idleHandle !== undefined && typeof idleWindow.cancelIdleCallback === 'function') {
+      idleWindow.cancelIdleCallback(idleHandle);
+    }
+    cancelPluginStartupSyncSchedule = undefined;
+  };
 };
 
 const configureWindow = async (osType: string) => {
@@ -896,6 +936,7 @@ const closeAfterPersist = async () => {
       window.clearInterval(syncTimer);
       syncTimer = undefined;
     }
+    cancelPluginStartupSyncSchedule?.();
     await persistPlaybackSession(true);
 
     try {
@@ -1110,11 +1151,25 @@ onMounted(async () => {
     }
   };
 
-  const pluginStartupTask = (async () => {
-    await syncExternalPlugins(true);
-    await retryRestorePlaybackSession();
-  })().catch(error => {
-    console.warn('[App] Failed to run plugin startup sync:', error);
+  let pluginStartupTask: Promise<void> | null = null;
+  const pluginStartupSettled = new Promise<void>(resolve => {
+    cancelPluginStartupSyncSchedule = scheduleStartupBackgroundTask(() => {
+      appLogInfo('plugins.startup_sync.begin', '后台插件校验开始。', {
+        delayMs: PLUGIN_STARTUP_SYNC_DELAY_MS,
+      }, 'plugin');
+      pluginStartupTask = (async () => {
+        await syncExternalPlugins(true);
+        await retryRestorePlaybackSession();
+      })()
+        .catch(error => {
+          console.warn('[App] Failed to run plugin startup sync:', error);
+          appLogError('plugins.startup_sync.failed', '后台插件校验失败。', errorToLogDetails(error), 'plugin');
+        })
+        .finally(() => {
+          resolve();
+        });
+      void pluginStartupTask;
+    });
   });
 
   const hydrateMediaAssetsTask = (async () => {
@@ -1147,7 +1202,7 @@ onMounted(async () => {
 
   if (!didRestorePlaybackSession) {
     void Promise
-      .allSettled([pluginStartupTask, scanStartupTask].filter((task): task is Promise<void> => Boolean(task)))
+      .allSettled([pluginStartupSettled, scanStartupTask].filter((task): task is Promise<void> => Boolean(task)))
       .finally(() => {
         isPlaybackSessionRestorePending = false;
       });
@@ -1160,6 +1215,7 @@ onBeforeUnmount(() => {
   if (!isClosingWindow) {
     void persistPlaybackSession();
   }
+  cancelPluginStartupSyncSchedule?.();
   if (syncTimer) {
     window.clearInterval(syncTimer);
   }

@@ -51,6 +51,10 @@ const toHexDigest = async (bytes: Uint8Array) => {
     .join('');
 };
 
+const yieldToBrowser = () => new Promise<void>(resolve => {
+  window.setTimeout(resolve, 0);
+});
+
 class WorkerPluginHost {
   private readonly worker: Worker;
   private readonly moduleUrl: string;
@@ -274,6 +278,7 @@ const verifyInstalledPluginFiles = async (plugin: InstalledPluginSetting) => {
   }
 
   for (const [relativePath, expectedHash] of Object.entries(plugin.installedIntegrity.files)) {
+    await yieldToBrowser();
     const bytes = await readFile(pluginStoragePath(plugin.id, relativePath), {
       baseDir: BaseDirectory.AppData,
     });
@@ -321,6 +326,7 @@ class PluginRuntimeService {
     }
 
     for (const plugin of plugins) {
+      await yieldToBrowser();
       if (!plugin.enabled) continue;
       if (plugin.runtime !== 'web-worker-esm') {
         const reason = `Unsupported runtime: ${plugin.runtime}`;
