@@ -9,6 +9,7 @@ use std::path::Path;
 
 mod app_logger;
 mod native_audio;
+mod window_state;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -283,6 +284,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .setup(|app| {
             app_logger::append_native_startup_log(app.handle());
+            window_state::setup_window_position_memory(app);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
