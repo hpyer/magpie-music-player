@@ -8,7 +8,7 @@
 
 三个发布单元可以独立发版。只有在插件协议、CLI 行为和桌面应用同时变更时，才需要组合发布。
 
-官方插件随桌面应用发布。官方插件列表维护在 `plugins/official-plugins.json`，每个官方插件的 release zip 存放在对应目录的 `release/` 目录并纳入 git 管理。发布桌面应用时，GitHub Release 会同时上传这些官方插件包。
+官方插件列表维护在 `plugins/official-plugins.json`，每个官方插件的 release zip 存放在对应目录的 `release/` 目录并纳入 git 管理。官方插件包通过仓库文件下载，不随桌面应用 GitHub Release 重复上传。
 
 发布变动统一记录在根目录 `CHANGELOG.md`。每次发布前，应根据 git 历史整理对应版本的变动内容。桌面应用发布到 GitHub Release 时，会读取 `CHANGELOG.md` 中对应版本的段落作为 Release notes。
 
@@ -43,7 +43,7 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
-确认官方插件包已经生成：
+如果官方插件有变更，确认官方插件包已经重新生成：
 
 ```bash
 pnpm --filter @magpie-music/plugin-types build
@@ -158,7 +158,7 @@ pnpm build
 pnpm --filter magpie-music-player web:build
 ```
 
-确认 `plugins/official-plugins.json` 中列出的官方插件都有对应 release 包。新增官方插件时，同时更新根 README 的官方插件列表。
+如果官方插件有变更，确认 `plugins/official-plugins.json` 中列出的官方插件都有对应 release 包。新增官方插件时，同时更新根 README 的官方插件列表。
 
 3. 根据上一个 app tag 到当前提交的 git 历史更新 `CHANGELOG.md`：
 
@@ -204,13 +204,7 @@ git push github v1.2.0
 - Windows `.exe` / `.msi`
 - Linux `.AppImage` / `.deb` / `.rpm`
 
-三个平台构建全部成功后，会创建 GitHub Release 并上传安装包。
-
-同时上传的官方插件包来自：
-
-```text
-plugins/*/release/*.zip
-```
+三个平台构建全部成功后，会创建 GitHub Release 并上传桌面应用安装包。
 
 GitHub Release 正文会自动使用 `CHANGELOG.md` 中 `## v1.2.0 - YYYY-MM-DD` 到下一个二级标题之间的内容。
 
