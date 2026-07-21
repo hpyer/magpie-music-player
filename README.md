@@ -4,6 +4,26 @@ Magpie Music Player 是一个本地优先的桌面音乐播放器，基于 Tauri
 
 项目不会内置公共音乐搜索、公共歌词搜索、公共歌曲信息搜索或歌曲下载服务。涉及第三方内容来源的能力应由用户自行选择可信插件完成，并由插件作者和使用者共同确认内容来源、平台条款和版权许可。
 
+## 应用截图
+
+<p align="center">
+  <a href="./screenshots/app.png">
+    <img src="./screenshots/app.png" alt="Magpie Music Player 主界面" width="560">
+  </a>
+</p>
+
+<p align="center">
+  <a href="./screenshots/lyric.png">
+    <img src="./screenshots/lyric.png" alt="歌词界面" width="150">
+  </a>
+  <a href="./screenshots/playlist.png">
+    <img src="./screenshots/playlist.png" alt="播放列表界面" width="150">
+  </a>
+  <a href="./screenshots/setting.png">
+    <img src="./screenshots/setting.png" alt="设置界面" width="150">
+  </a>
+</p>
+
 ## 项目地址
 
 - GitHub: [hpyer/magpie-music-player](https://github.com/hpyer/magpie-music-player)
