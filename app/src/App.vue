@@ -277,6 +277,15 @@ const pluginPlaylistPlaceholder = computed(() => {
   if (isLoadingPluginPlaylists.value) return '读取中...';
   return pluginPlaylistOptions.value.length ? '请选择列表' : '暂无远程播放列表';
 });
+const defaultPlaylistNameForType = (type: PlaylistFormType) => {
+  if (type === 'local-directory') return '默认本地列表';
+
+  const pluginId = type.startsWith('plugin:')
+    ? type.slice('plugin:'.length)
+    : '';
+  const pluginName = pluginPlaylistSources.value.find(plugin => plugin.id === pluginId)?.name ?? '远程';
+  return `默认${pluginName}列表`;
+};
 const activeLyricSearchResults = computed(() => lyricSearchResultsByPlugin.value[activeLyricSearchPluginId.value] ?? []);
 const activeSongInfoSearchResults = computed(() => songInfoSearchResultsByPlugin.value[activeSongInfoSearchPluginId.value] ?? []);
 const activeMusicSearchResults = computed(() => networkSearchResultsByPlugin.value[activeMusicSearchPluginId.value] ?? []);
@@ -302,9 +311,8 @@ const updatePluginConfigFromInput = (plugin: InstalledPluginSetting, field: Plug
   setPluginConfigValue(plugin, field, target?.value ?? '');
 };
 
-const updatePluginConfigFromBoolean = (plugin: InstalledPluginSetting, field: PluginConfigField, event: Event) => {
-  const target = event.target as HTMLInputElement | null;
-  setPluginConfigValue(plugin, field, Boolean(target?.checked));
+const updatePluginConfigFromBoolean = (plugin: InstalledPluginSetting, field: PluginConfigField, checked: boolean) => {
+  setPluginConfigValue(plugin, field, checked);
 };
 
 const getShortcutDefault = (shortcutId: ShortcutSetting['id']) => {
@@ -629,6 +637,10 @@ watch([
 });
 watch(() => playlistForm.value.type, type => {
   if (!isPlaylistModalOpen.value) return;
+
+  if (playlistFormMode.value === 'create') {
+    playlistForm.value.name = defaultPlaylistNameForType(type);
+  }
 
   if (type.startsWith('plugin:')) {
     playlistForm.value.pluginId = selectedPlaylistPluginId.value;
@@ -1440,7 +1452,7 @@ const openCreatePlaylistModal = async () => {
   playlistFormMode.value = 'create';
   editingPlaylistId.value = null;
   playlistForm.value = {
-    name: '默认列表',
+    name: defaultPlaylistNameForType('local-directory'),
     type: 'local-directory',
     localDir: playlistStore.localMusicDir ?? playlistStore.currentPlaylist?.localDir ?? '',
     pluginId: '',
@@ -2010,10 +2022,7 @@ const removePlugin = async (pluginId: string) => {
   expandedPluginIds.value = nextExpandedIds;
 };
 
-const updatePluginEnabled = (plugin: InstalledPluginSetting, event: Event) => {
-  const input = event.target as HTMLInputElement;
-  const nextEnabled = input.checked;
-
+const updatePluginEnabled = (plugin: InstalledPluginSetting, nextEnabled: boolean) => {
   if (!nextEnabled) {
     plugin.enabled = false;
     return;
@@ -2021,7 +2030,6 @@ const updatePluginEnabled = (plugin: InstalledPluginSetting, event: Event) => {
 
   if (plugin.blocked) {
     plugin.enabled = false;
-    input.checked = false;
     showToast(blockedPluginMessage(plugin), { title: '插件已被阻止', kind: 'warning' });
     return;
   }
@@ -2029,7 +2037,6 @@ const updatePluginEnabled = (plugin: InstalledPluginSetting, event: Event) => {
   const missingLabels = missingPluginConfigLabels(plugin);
   if (missingLabels.length) {
     plugin.enabled = false;
-    input.checked = false;
     expandPluginDetails(plugin.id);
     notifyMissingPluginConfig(plugin, missingLabels);
     return;

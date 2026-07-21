@@ -37,42 +37,51 @@ defineEmits<{
     @close="$emit('close')"
   >
     <form class="playlist-modal-form" @submit.prevent="$emit('submit')">
-      <label class="form-field">
-        <span>播放列表名称</span>
-        <input v-model="playlistForm.name" type="text" autocomplete="off" placeholder="请输入名称">
-      </label>
-
-      <label class="form-field">
+      <div class="form-field">
         <span>播放列表类型</span>
         <div class="type-options" role="radiogroup" aria-label="播放列表类型">
-          <label
+          <button
             v-for="option in playlistTypeOptions"
             :key="option.value"
+            type="button"
             class="type-option"
             :class="{ active: playlistForm.type === option.value }"
+            :aria-pressed="playlistForm.type === option.value"
+            @click="playlistForm.type = option.value"
           >
-            <input v-model="playlistForm.type" type="radio" :value="option.value">
             <span>{{ option.label }}</span>
-          </label>
+          </button>
         </div>
-      </label>
+      </div>
 
-      <label v-if="isLocalDirectoryPlaylist" class="form-field">
+      <div class="form-field">
+        <span>播放列表名称</span>
+        <input v-model="playlistForm.name" type="text" autocomplete="off" placeholder="请输入名称" aria-label="播放列表名称">
+      </div>
+
+      <div v-if="isLocalDirectoryPlaylist" class="form-field">
         <span>目录地址</span>
         <div class="directory-input">
-          <input v-model="playlistForm.localDir" type="text" readonly placeholder="请选择本地音乐目录">
+          <input v-model="playlistForm.localDir" type="text" readonly placeholder="请选择本地音乐目录" aria-label="目录地址">
           <button type="button" class="secondary-action-btn" @click="$emit('select-playlist-directory')">选择</button>
         </div>
-      </label>
+      </div>
 
-      <label v-if="isLocalDirectoryPlaylist" class="form-switch">
-        <input v-model="playlistForm.scanImmediately" type="checkbox">
-        <span class="switch-track" aria-hidden="true"></span>
+      <div v-if="isLocalDirectoryPlaylist" class="form-switch">
+        <button
+          type="button"
+          class="switch-button"
+          :aria-pressed="playlistForm.scanImmediately"
+          aria-label="立即扫描文件"
+          @click="playlistForm.scanImmediately = !playlistForm.scanImmediately"
+        >
+          <span class="switch-track" aria-hidden="true"></span>
+        </button>
         <span>立即扫描文件</span>
-      </label>
+      </div>
 
       <template v-if="isPluginPlaylist">
-        <label class="form-field">
+        <div class="form-field">
           <span>远程播放列表</span>
           <div class="directory-input">
             <AppSelect
@@ -86,7 +95,7 @@ defineEmits<{
               刷新
             </button>
           </div>
-        </label>
+        </div>
       </template>
 
       <footer class="modal-actions playlist-modal-actions" :class="{ 'with-delete': playlistFormMode === 'edit' }">

@@ -47,9 +47,9 @@ defineEmits<{
   (event: 'toggle-plugin-expanded', value: string): void;
   (event: 'update-cache-group-limit', groupId: CacheGroup['id'], value: Event): void;
   (event: 'update-cache-source-allowed', sourceId: string, value: boolean): void;
-  (event: 'update-plugin-config-boolean', plugin: InstalledPluginSetting, field: PluginConfigField, value: Event): void;
+  (event: 'update-plugin-config-boolean', plugin: InstalledPluginSetting, field: PluginConfigField, value: boolean): void;
   (event: 'update-plugin-config-input', plugin: InstalledPluginSetting, field: PluginConfigField, value: Event): void;
-  (event: 'update-plugin-enabled', plugin: InstalledPluginSetting, value: Event): void;
+  (event: 'update-plugin-enabled', plugin: InstalledPluginSetting, value: boolean): void;
   (event: 'update-shortcuts-enabled', value: boolean): void;
 }>();
 </script>
@@ -113,10 +113,17 @@ defineEmits<{
                     <span class="plugin-meta-row">
                       <span v-for="tag in pluginCapabilityTags(plugin)" :key="tag" class="plugin-capability-tag">{{ tag }}</span>
                       <small>v{{ plugin.version }}</small>
-                      <label class="plugin-switch" :class="{ blocked: plugin.blocked }" :title="plugin.blocked ? '插件已被阻止' : (plugin.enabled ? '禁用插件' : '启用插件')">
-                        <input :checked="plugin.enabled" :disabled="Boolean(plugin.blocked)" type="checkbox" @change="$emit('update-plugin-enabled', plugin, $event)">
+                      <button
+                        type="button"
+                        class="plugin-switch"
+                        :class="{ blocked: plugin.blocked }"
+                        :disabled="Boolean(plugin.blocked)"
+                        :title="plugin.blocked ? '插件已被阻止' : (plugin.enabled ? '禁用插件' : '启用插件')"
+                        :aria-pressed="plugin.enabled"
+                        @click="$emit('update-plugin-enabled', plugin, !plugin.enabled)"
+                      >
                         <span class="switch-track" aria-hidden="true"></span>
-                      </label>
+                      </button>
                     </span>
                     <em>{{ plugin.manifest.description || plugin.id }}</em>
                     <em v-if="plugin.blocked" class="plugin-blocked-note">
@@ -125,15 +132,18 @@ defineEmits<{
                     <em v-else-if="plugin.warning" class="plugin-warning-note">
                       警告：{{ plugin.warning.reason || plugin.warning.entryId }}
                     </em>
-                    <label v-if="isCacheSourceConfigurable(plugin)" class="settings-switch plugin-cache-switch">
-                      <input
-                        :checked="isCacheSourceAllowed(plugin.id)"
-                        type="checkbox"
-                        @change="$emit('update-cache-source-allowed', plugin.id, ($event.target as HTMLInputElement).checked)"
+                    <span v-if="isCacheSourceConfigurable(plugin)" class="settings-switch plugin-cache-switch">
+                      <button
+                        type="button"
+                        class="switch-button"
+                        :aria-pressed="isCacheSourceAllowed(plugin.id)"
+                        aria-label="允许缓存后播放"
+                        @click="$emit('update-cache-source-allowed', plugin.id, !isCacheSourceAllowed(plugin.id))"
                       >
-                      <span class="switch-track" aria-hidden="true"></span>
+                        <span class="switch-track" aria-hidden="true"></span>
+                      </button>
                       <span>允许缓存后播放</span>
-                    </label>
+                    </span>
                   </span>
                   <div class="plugin-card-actions">
                     <button
@@ -162,16 +172,19 @@ defineEmits<{
                 <div v-if="pluginConfigFields(plugin).length && expandedPluginIds.has(plugin.id)" class="plugin-details">
                   <div class="plugin-config-grid">
                     <template v-for="field in pluginConfigFields(plugin)" :key="field.key">
-                      <label v-if="field.type === 'boolean'" class="form-switch plugin-config-switch">
-                        <input
-                          type="checkbox"
-                          :checked="Boolean(plugin.config[field.key] ?? field.default)"
-                          @change="$emit('update-plugin-config-boolean', plugin, field, $event)"
+                      <div v-if="field.type === 'boolean'" class="form-switch plugin-config-switch">
+                        <button
+                          type="button"
+                          class="switch-button"
+                          :aria-pressed="Boolean(plugin.config[field.key] ?? field.default)"
+                          :aria-label="field.label"
+                          @click="$emit('update-plugin-config-boolean', plugin, field, !Boolean(plugin.config[field.key] ?? field.default))"
                         >
-                        <span class="switch-track" aria-hidden="true"></span>
+                          <span class="switch-track" aria-hidden="true"></span>
+                        </button>
                         <span>{{ field.label }}</span>
-                      </label>
-                      <label v-else class="settings-field compact">
+                      </div>
+                      <div v-else class="settings-field compact">
                         <span>{{ field.label }}{{ field.required ? ' *' : '' }}</span>
                         <select
                           v-if="field.type === 'select'"
@@ -191,7 +204,7 @@ defineEmits<{
                           :autocomplete="field.type === 'password' ? 'current-password' : 'off'"
                           @input="$emit('update-plugin-config-input', plugin, field, $event)"
                         >
-                      </label>
+                      </div>
                     </template>
                   </div>
                 </div>
@@ -201,16 +214,19 @@ defineEmits<{
           </section>
 
           <section v-else-if="settingsTab === 'shortcuts'" class="settings-section">
-            <label class="settings-switch">
-              <input
-                :checked="settingsDraft.shortcutsEnabled"
-                type="checkbox"
-                @change="$emit('update-shortcuts-enabled', ($event.target as HTMLInputElement).checked)"
+            <div class="settings-switch">
+              <button
+                type="button"
+                class="switch-button"
+                :aria-pressed="settingsDraft.shortcutsEnabled"
+                aria-label="启用全局快捷键"
+                @click="$emit('update-shortcuts-enabled', !settingsDraft.shortcutsEnabled)"
               >
-              <span class="switch-track" aria-hidden="true"></span>
+                <span class="switch-track" aria-hidden="true"></span>
+              </button>
               <span>启用全局快捷键</span>
-            </label>
-            <label v-for="shortcut in settingsDraft.shortcuts" :key="shortcut.id" class="settings-field">
+            </div>
+            <div v-for="shortcut in settingsDraft.shortcuts" :key="shortcut.id" class="settings-field">
               <span>{{ shortcut.name }}</span>
               <input
                 v-model="shortcut.keys"
@@ -225,19 +241,19 @@ defineEmits<{
                 @keyup="$emit('release-shortcut-key', $event)"
                 @blur="$emit('restore-shortcut-default', shortcut.id)"
               >
-            </label>
+            </div>
           </section>
 
           <section v-else-if="settingsTab === 'cache'" class="settings-section">
             <div v-for="group in cacheGroups" :key="group.id" class="cache-group">
               <h3>{{ group.title }}</h3>
-              <label class="settings-field">
+              <div class="settings-field">
                 <div class="directory-input">
-                  <input :value="group.directory" type="text" readonly>
+                  <input :value="group.directory" type="text" readonly :aria-label="`${group.title}目录`">
                   <button type="button" class="secondary-action-btn" @click="$emit('select-cache-group-directory', group.id)">选择</button>
                 </div>
-              </label>
-              <label class="settings-field cache-limit-field">
+              </div>
+              <div class="settings-field cache-limit-field">
                 <span>容量上限 (GB)</span>
                 <div class="cache-limit-row">
                   <input
@@ -251,7 +267,7 @@ defineEmits<{
                     @input="$emit('update-cache-group-limit', group.id, $event)"
                   >
                 </div>
-              </label>
+              </div>
               <div class="cache-actions-row">
                 <span class="cache-usage">已用 {{ cacheUsageLabel(group.id) }}</span>
                 <button

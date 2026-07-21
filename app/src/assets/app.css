@@ -1063,7 +1063,6 @@ html[data-platform="windows"] .scan-overlay span {
   background: var(--theme-field);
   font-size: 13px;
   font-weight: 400;
-  cursor: pointer;
   transition: background 0.16s ease;
 }
 
@@ -1079,6 +1078,20 @@ html[data-platform="windows"] .scan-overlay span {
   position: absolute;
   opacity: 0;
   pointer-events: none;
+}
+
+.switch-button {
+  display: flex;
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch-button:disabled {
+  cursor: default;
 }
 
 .switch-track {
@@ -1108,13 +1121,17 @@ html[data-platform="windows"] .scan-overlay span {
 
 .settings-switch input:checked + .switch-track,
 .form-switch input:checked + .switch-track,
-.plugin-switch input:checked + .switch-track {
+.plugin-switch input:checked + .switch-track,
+.switch-button[aria-pressed="true"] .switch-track,
+.plugin-switch[aria-pressed="true"] .switch-track {
   background: var(--theme-control);
 }
 
 .settings-switch input:checked + .switch-track::after,
 .form-switch input:checked + .switch-track::after,
-.plugin-switch input:checked + .switch-track::after {
+.plugin-switch input:checked + .switch-track::after,
+.switch-button[aria-pressed="true"] .switch-track::after,
+.plugin-switch[aria-pressed="true"] .switch-track::after {
   background: var(--theme-control-ink);
   transform: translateX(16px);
 }
@@ -1452,8 +1469,10 @@ html[data-platform="windows"] .scan-overlay span {
 .plugin-switch {
   min-height: 18px;
   gap: 0;
+  border: 0;
   padding: 0;
   background: transparent;
+  cursor: pointer;
 }
 
 .plugin-switch .switch-track {
@@ -1467,6 +1486,10 @@ html[data-platform="windows"] .scan-overlay span {
 }
 
 .plugin-switch input:checked + .switch-track::after {
+  transform: translateX(12px);
+}
+
+.plugin-switch[aria-pressed="true"] .switch-track::after {
   transform: translateX(12px);
 }
 

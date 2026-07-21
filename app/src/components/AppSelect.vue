@@ -101,16 +101,17 @@ onBeforeUnmount(() => {
 }
 
 .app-select-trigger {
+  position: relative;
   width: 100%;
   height: 34px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
   border: 0;
   border-radius: 7px;
-  padding: 0 8px;
+  padding: 0 34px 0 8px;
   color: var(--ink, #081012);
   background: var(--theme-field, rgba(255, 255, 255, 0.34));
   outline: none;
@@ -149,9 +150,10 @@ onBeforeUnmount(() => {
 }
 
 .app-select-chevron {
+  position: absolute;
+  right: 14px;
   width: 8px;
   height: 8px;
-  justify-self: center;
   border-right: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
   transform: rotate(45deg);
