@@ -1,0 +1,155 @@
+name: Publish npm packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - plugin-types
+          - plugin-cli
+      npm_tag:
+        description: npm dist-tag
+        required: true
+        default: latest
+        type: string
+      dry_run:
+        description: Run npm publish with --dry-run
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'plugin-types-v*'
+      - 'plugin-cli-v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish selected package
+    runs-on: ubuntu-22.04
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      NPM_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.npm_tag || 'latest' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select packages
+        id: select
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            target="${{ inputs.package }}"
+          else
+            case "${GITHUB_REF_NAME}" in
+              plugin-types-v*) target="plugin-types" ;;
+              plugin-cli-v*) target="plugin-cli" ;;
+              *) echo "Unsupported tag: ${GITHUB_REF_NAME}" >&2; exit 1 ;;
+            esac
+          fi
+
+          publish_types=false
+          publish_cli=false
+          case "${target}" in
+            both)
+              publish_types=true
+              publish_cli=true
+              ;;
+            plugin-types)
+              publish_types=true
+              ;;
+            plugin-cli)
+              publish_cli=true
+              ;;
+            *)
+              echo "Unsupported package selection: ${target}" >&2
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "target=${target}"
+            echo "publish_types=${publish_types}"
+            echo "publish_cli=${publish_cli}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Validate tag version
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target="${{ steps.select.outputs.target }}"
+          version="$(node -p "require('./packages/${target}/package.json').version")"
+          expected="${target}-v${version}"
+
+          if [ "${GITHUB_REF_NAME}" != "${expected}" ]; then
+            echo "::error title=Tag/version mismatch::Expected tag ${expected}, got ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build plugin types
+        if: steps.select.outputs.publish_types == 'true' || steps.select.outputs.publish_cli == 'true'
+        run: pnpm --filter @magpie-music/plugin-types build
+
+      - name: Build plugin CLI
+        if: steps.select.outputs.publish_cli == 'true'
+        run: pnpm --filter @magpie-music/plugin-cli build
+
+      - name: Publish plugin types
+        if: steps.select.outputs.publish_types == 'true'
+        shell: bash
+        working-directory: packages/plugin-types
+        run: |
+          set -euo pipefail
+
+          args=(--access public --tag "${NPM_TAG}")
+          if [ "${DRY_RUN}" = "true" ]; then
+            args+=(--dry-run)
+          else
+            args+=(--provenance)
+          fi
+
+          pnpm publish "${args[@]}"
+
+      - name: Publish plugin CLI
+        if: steps.select.outputs.publish_cli == 'true'
+        shell: bash
+        working-directory: packages/plugin-cli
+        run: |
+          set -euo pipefail
+
+          args=(--access public --tag "${NPM_TAG}")
+          if [ "${DRY_RUN}" = "true" ]; then
+            args+=(--dry-run)
+          else
+            args+=(--provenance)
+          fi
+
+          pnpm publish "${args[@]}"

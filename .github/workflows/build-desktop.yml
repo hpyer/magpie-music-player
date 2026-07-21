@@ -1,0 +1,249 @@
+name: Build desktop installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to build and publish, for example v1.0.0
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal
+            os: macos-latest
+            script: desktop:build:mac
+            artifact: app/src-tauri/target/universal-apple-darwin/release/bundle
+          - name: Windows
+            os: windows-latest
+            script: desktop:build:windows
+            artifact: app/src-tauri/target/release/bundle
+          - name: Linux
+            os: ubuntu-22.04
+            script: desktop:build:linux
+            artifact: app/src-tauri/target/release/bundle
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Validate app release version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_tag="${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+          expected_tag="v$(node -p "require('./app/package.json').version")"
+          cargo_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' app/src-tauri/Cargo.toml | head -n 1)"
+          workspace_version="$(node -p "require('./package.json').version")"
+
+          if [ "${release_tag}" != "${expected_tag}" ]; then
+            echo "::error title=Tag/version mismatch::Expected app release tag ${expected_tag}, got ${release_tag}."
+            exit 1
+          fi
+
+          if [ "${cargo_version}" != "${expected_tag#v}" ]; then
+            echo "::error title=Cargo version mismatch::app/src-tauri/Cargo.toml version ${cargo_version} does not match app/package.json ${expected_tag#v}."
+            exit 1
+          fi
+
+          if [ "${workspace_version}" != "${expected_tag#v}" ]; then
+            echo "::error title=Workspace version mismatch::Root package.json version ${workspace_version} does not match app/package.json ${expected_tag#v}."
+            exit 1
+          fi
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS targets
+        if: runner.os == 'macOS'
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libfuse2 \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            libxdo-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: |
+          pnpm --filter @magpie-music/plugin-types build
+          pnpm --filter @magpie-music/plugin-cli build
+
+      - name: Build installers
+        run: pnpm ${{ matrix.script }}
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  official-plugins:
+    name: Build official plugins
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build official plugins
+        run: |
+          pnpm --filter @magpie-music/plugin-types build
+          pnpm --filter @magpie-music/plugin-cli build
+          pnpm plugins:build
+
+      - name: Validate official plugin packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const { readFileSync, existsSync } = require('node:fs');
+          const { join } = require('node:path');
+
+          const officialPlugins = JSON.parse(readFileSync('plugins/official-plugins.json', 'utf8')).plugins;
+          for (const plugin of officialPlugins) {
+            const manifest = JSON.parse(readFileSync(join(plugin.directory, 'plugin.json'), 'utf8'));
+            if (manifest.id !== plugin.id) {
+              throw new Error(`官方插件 id 不一致：${plugin.directory}`);
+            }
+            if (manifest.version !== plugin.version) {
+              throw new Error(`官方插件版本不一致：${plugin.directory}`);
+            }
+            const packagePath = join(plugin.directory, 'release', plugin.releaseFile);
+            if (!existsSync(packagePath)) {
+              throw new Error(`官方插件包不存在：${packagePath}`);
+            }
+            console.log(`OK ${packagePath}`);
+          }
+          NODE
+
+      - name: Upload official plugins
+        uses: actions/upload-artifact@v4
+        with:
+          name: official plugins
+          path: plugins/*/release/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-22.04
+    needs:
+      - build
+      - official-plugins
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Download bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: release-bundles
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_tag="${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+          version="${release_tag#v}"
+
+          awk -v version="${version}" '
+            BEGIN {
+              capture = 0
+              found = 0
+            }
+            /^## / {
+              if (capture) {
+                exit
+              }
+              if ($0 ~ "^## v" version "([ -]|$)") {
+                capture = 1
+                found = 1
+              }
+            }
+            capture {
+              print
+            }
+            END {
+              if (!found) {
+                exit 1
+              }
+            }
+          ' CHANGELOG.md > release-notes.md
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find release-bundles -type f \
+            \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.dmg' -o -name '*.msi' -o -name '*.exe' -o -name '*.zip' \) \
+            -exec cp {} release-assets/ \;
+          find release-assets -type f -print | sort
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          name: Magpie Music Player ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          body_path: release-notes.md
+          files: release-assets/*
+          fail_on_unmatched_files: true
