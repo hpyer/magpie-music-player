@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# pnpm local stores and state
+.pnpm-store/
+**/.pnpm-store/
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+dist-ssr/
+**/dist/
+release/
+**/release/
+!plugins/*/release/
+!plugins/*/release/*.zip
+
+# Tauri / Rust generated outputs
+target/
+**/target/
+app/src-tauri/gen/schemas/
+
+# Vite / Vue / TypeScript caches
+.vite/
+.vite-temp/
+.vue-global-types/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Test and coverage outputs
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Editor and OS files
+.DS_Store
+._*
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Generated archives and packages
+*.zip
+!plugins/*/release/*.zip
+*.tgz
+*.tar.gz
+*.dmg
+*.msi
+*.deb
+*.rpm
+*.AppImage

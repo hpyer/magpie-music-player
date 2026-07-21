@@ -1,0 +1,26 @@
+{
+  "name": "magpie-music-player-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter @magpie-music/plugin-types build && pnpm --filter @magpie-music/plugin-cli build && pnpm --filter magpie-music-player web:build && pnpm --filter './plugins/*' --if-present build",
+    "web:build": "pnpm --filter magpie-music-player web:build",
+    "plugins:build": "pnpm --filter './plugins/*' --if-present build",
+    "desktop:build": "pnpm --filter magpie-music-player build",
+    "desktop:build:mac": "pnpm --filter magpie-music-player build:mac",
+    "desktop:build:mac:intel": "pnpm --filter magpie-music-player build:mac:intel",
+    "desktop:build:mac:apple": "pnpm --filter magpie-music-player build:mac:apple",
+    "desktop:build:mac:universal": "pnpm --filter magpie-music-player build:mac:universal",
+    "desktop:build:windows": "pnpm --filter magpie-music-player build:windows",
+    "desktop:build:windows:cross": "pnpm --filter magpie-music-player build:windows:cross",
+    "desktop:build:linux": "pnpm --filter magpie-music-player build:linux",
+    "desktop:build:linux:cross": "pnpm --filter magpie-music-player build:linux:cross",
+    "desktop:build:linux:cross:x64": "pnpm --filter magpie-music-player build:linux:cross:x64",
+    "desktop:build:raw": "pnpm --filter magpie-music-player build:raw"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2"
+  }
+}

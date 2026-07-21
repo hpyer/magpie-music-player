@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "MagpieMusicPlayer",
+        "width": 360,
+        "height": 336,
+        "decorations": false,
+        "transparent": false,
+        "resizable": false,
+        "shadow": false,
+        "backgroundColor": [255, 255, 255, 255]
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["deb", "rpm", "appimage"],
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
+      "deb": {
+        "depends": [
+          "libasound2",
+          "gstreamer1.0-libav",
+          "gstreamer1.0-plugins-good",
+          "gstreamer1.0-plugins-bad",
+          "gstreamer1.0-plugins-ugly"
+        ],
+        "files": {
+          "/usr/share/metainfo/cn.hpyer.magpie.music.metainfo.xml": "linux/cn.hpyer.magpie.music.metainfo.xml"
+        },
+        "section": "sound",
+        "priority": "optional"
+      },
+      "rpm": {
+        "release": "1"
+      }
+    }
+  }
+}

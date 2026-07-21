@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>cn.hpyer.magpie.music</id>
+  <name>MagpieMusicPlayer</name>
+  <name xml:lang="zh-CN">MagpieMusicPlayer</name>
+  <summary>A local-first desktop music player with plugin support.</summary>
+  <summary xml:lang="zh-CN">一款支持插件扩展的本地优先桌面音乐播放器。</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <developer id="cn.hpyer">
+    <name>Hpyer</name>
+  </developer>
+  <url type="homepage">https://github.com/hpyer/magpie-music-player</url>
+  <description>
+    <p>MagpieMusicPlayer is a local-first desktop music player with local library management, playlists, configurable caches, lyrics and song info lookup, and a plugin system for user-authorized services.</p>
+    <p xml:lang="zh-CN">MagpieMusicPlayer 是一款本地优先的桌面音乐播放器，支持本地音乐管理、播放列表、可配置缓存、歌词与歌曲信息检索，以及面向用户授权服务的插件扩展系统。</p>
+  </description>
+  <launchable type="desktop-id">MagpieMusicPlayer.desktop</launchable>
+  <provides>
+    <id>MagpieMusicPlayer.desktop</id>
+  </provides>
+</component>

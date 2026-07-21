@@ -1,0 +1,47 @@
+{
+  "name": "magpie-music-player",
+  "private": true,
+  "version": "1.0.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "tauri": "tauri",
+    "build": "node scripts/build-desktop.mjs current",
+    "build:mac": "node scripts/build-desktop.mjs mac",
+    "build:mac:intel": "node scripts/build-desktop.mjs mac:intel",
+    "build:mac:apple": "node scripts/build-desktop.mjs mac:apple",
+    "build:mac:universal": "node scripts/build-desktop.mjs mac:universal",
+    "build:windows": "node scripts/build-desktop.mjs windows",
+    "build:windows:cross": "node scripts/build-desktop.mjs windows:cross",
+    "build:linux": "node scripts/build-desktop.mjs linux",
+    "build:linux:cross": "node scripts/build-linux-docker.mjs x64",
+    "build:raw": "node scripts/build-desktop.mjs raw",
+    "web:dev": "vite",
+    "web:build": "vue-tsc --noEmit && vite build",
+    "web:preview": "vite preview",
+    "icon": "tauri icon src-tauri/app-icon.png"
+  },
+  "dependencies": {
+    "@magpie-music/plugin-types": "workspace:*",
+    "@tauri-apps/api": "2.10.1",
+    "@tauri-apps/plugin-dialog": "2.6.0",
+    "@tauri-apps/plugin-fs": "2.4.5",
+    "@tauri-apps/plugin-global-shortcut": "2.3.2",
+    "@tauri-apps/plugin-http": "2.5.7",
+    "@tauri-apps/plugin-opener": "2.5.3",
+    "@tauri-apps/plugin-os": "2.3.2",
+    "jszip": "^3.10.1",
+    "music-metadata": "^11.13.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.13",
+    "vue-router": "^5.0.4"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.10.1",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "vue-tsc": "^2.1.10"
+  }
+}

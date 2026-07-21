@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "MagpieMusicPlayer",
+        "width": 360,
+        "height": 336,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "shadow": true,
+        "backgroundColor": [0, 0, 0, 0]
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["nsis", "msi"],
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": true,
+        "languages": ["English", "SimpChinese"],
+        "compression": "lzma"
+      },
+      "wix": {
+        "upgradeCode": "3d7e1934-cde3-5e3c-b960-b1e4a0ef01f7",
+        "language": "en-US"
+      }
+    }
+  }
+}
