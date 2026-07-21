@@ -129,7 +129,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          args=(--access public --tag "${NPM_TAG}")
+          args=(--access public --tag "${NPM_TAG}" --no-git-checks)
           if [ "${DRY_RUN}" = "true" ]; then
             args+=(--dry-run)
           else
@@ -145,7 +145,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          args=(--access public --tag "${NPM_TAG}")
+          args=(--access public --tag "${NPM_TAG}" --no-git-checks)
           if [ "${DRY_RUN}" = "true" ]; then
             args+=(--dry-run)
           else
