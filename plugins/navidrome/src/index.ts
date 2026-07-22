@@ -40,13 +40,35 @@ interface NavidromeSong {
   track?: number;
 }
 
+interface NavidromeLegacyLyrics {
+  artist?: string;
+  title?: string;
+  value?: string;
+}
+
+interface NavidromeStructuredLyricLine {
+  start?: number;
+  value?: string;
+}
+
+interface NavidromeStructuredLyrics {
+  lang?: string;
+  synced?: boolean;
+  displayArtist?: string;
+  displayTitle?: string;
+  offset?: number;
+  line?: NavidromeStructuredLyricLine | NavidromeStructuredLyricLine[];
+}
+
 type NavidromeHostMessage =
   | { type: 'installation.config-schema' }
   | { type: 'runtime.initialize'; config: NavidromeConfig }
   | { type: 'ping' }
   | { type: 'playlist.list' }
   | { type: 'playlist.songs'; playlistId: string }
-  | { type: 'media.url'; mediaId: string };
+  | { type: 'media.url'; mediaId: string }
+  | { type: 'media.lyric'; mediaId: string }
+  | { type: 'media.cover'; mediaId: string };
 
 const PLUGIN_ID = 'cn.hpyer.magpie.navidrome';
 const DEFAULT_API_VERSION = '1.16.1';
@@ -82,6 +104,35 @@ const asArray = <T>(value: T | T[] | undefined | null): T[] => {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
 };
+
+const formatLrcTimestamp = (milliseconds: number) => {
+  const normalized = Math.max(0, Math.round(milliseconds));
+  const totalSeconds = Math.floor(normalized / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const centiseconds = Math.floor((normalized % 1000) / 10);
+  return `[${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}]`;
+};
+
+const structuredLyricsToText = (lyrics: NavidromeStructuredLyrics) => {
+  const lines = asArray(lyrics.line).filter(line => line.value?.trim());
+  if (!lines.length) return '';
+
+  if (!lyrics.synced) {
+    return lines.map(line => line.value?.trim() ?? '').join('\n');
+  }
+
+  const offset = lyrics.offset ?? 0;
+  return lines
+    .map(line => `${formatLrcTimestamp((line.start ?? 0) + offset)}${line.value?.trim() ?? ''}`)
+    .join('\n');
+};
+
+const bestStructuredLyrics = (items: NavidromeStructuredLyrics[]) => (
+  items.find(item => item.synced)
+  ?? items[0]
+  ?? null
+);
 
 const normalizeServerUrl = (serverUrl: string) => serverUrl.replace(/\/+$/, '');
 
@@ -260,12 +311,43 @@ class NavidromeClient {
     return asArray(response.playlist?.entry).map(song => this.toMediaItem(song, playlistId));
   }
 
+  async getMediaLyric(mediaId: string) {
+    const lyricBySongId = await this.getLyricsBySongId(mediaId).catch(() => '');
+    if (lyricBySongId) return lyricBySongId;
+
+    const song = await this.getSong(mediaId).catch(() => null);
+    if (!song?.title) return '';
+
+    return this.getLegacyLyrics(song.artist, song.title).catch(() => '');
+  }
+
   streamUrl(mediaId: string) {
     return this.endpoint('stream', { id: mediaId });
   }
 
+  async getMediaCover(mediaId: string) {
+    const song = await this.getSong(mediaId);
+    return song?.coverArt ? this.coverArtUrl(song.coverArt) : '';
+  }
+
   private coverArtUrl(coverArt: string) {
     return this.endpoint('getCoverArt', { id: coverArt });
+  }
+
+  private async getSong(mediaId: string) {
+    const response = await this.request<{ song?: NavidromeSong }>('getSong', { id: mediaId });
+    return response.song;
+  }
+
+  private async getLyricsBySongId(mediaId: string) {
+    const response = await this.request<{ lyricsList?: { structuredLyrics?: NavidromeStructuredLyrics | NavidromeStructuredLyrics[] } }>('getLyricsBySongId', { id: mediaId });
+    const lyrics = bestStructuredLyrics(asArray(response.lyricsList?.structuredLyrics));
+    return lyrics ? structuredLyricsToText(lyrics) : '';
+  }
+
+  private async getLegacyLyrics(artist: string | undefined, title: string) {
+    const response = await this.request<{ lyrics?: NavidromeLegacyLyrics }>('getLyrics', { artist, title });
+    return response.lyrics?.value?.trim() ?? '';
   }
 
   private toMediaItem(song: NavidromeSong, playlistId?: string): MediaItem {
@@ -296,7 +378,7 @@ function createNavidromePlugin(config: NavidromeConfig) {
   return {
     id: PLUGIN_ID,
     name: 'Navidrome',
-    version: '1.0.0',
+    version: '1.0.1',
     async listPlaylists() {
       return client.listPlaylists();
     },
@@ -305,6 +387,12 @@ function createNavidromePlugin(config: NavidromeConfig) {
     },
     async getMediaUrl(mediaId: string) {
       return client.streamUrl(mediaId);
+    },
+    async getMediaLyric(mediaId: string) {
+      return client.getMediaLyric(mediaId);
+    },
+    async getMediaCover(mediaId: string) {
+      return client.getMediaCover(mediaId);
     },
     async ping() {
       return client.ping();
@@ -337,6 +425,12 @@ export async function handleMessage(message: NavidromeHostMessage) {
   }
   if (message.type === 'media.url') {
     return activePlugin.getMediaUrl(message.mediaId);
+  }
+  if (message.type === 'media.lyric') {
+    return activePlugin.getMediaLyric(message.mediaId);
+  }
+  if (message.type === 'media.cover') {
+    return activePlugin.getMediaCover(message.mediaId);
   }
 
   throw new Error(`Unsupported message type: ${(message as { type: string }).type}`);

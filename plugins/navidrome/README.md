@@ -8,6 +8,8 @@
 - `getPlaylist`
 - `stream`
 - `getCoverArt`
+- `getLyricsBySongId`
+- `getLyrics`
 
 ## 构建
 
@@ -20,7 +22,7 @@ pnpm build
 `pnpm build` 会生成：
 
 ```text
-release/cn.hpyer.magpie.navidrome-1.0.0.zip
+release/cn.hpyer.magpie.navidrome-x.x.x.zip
 ```
 
 ## 运行时配置
@@ -49,5 +51,6 @@ release/cn.hpyer.magpie.navidrome-1.0.0.zip
 - 播放列表歌曲读取。
 - 媒体播放地址解析。
 - 封面地址读取。
+- 歌词读取。
 
 该插件面向用户自有或已授权的 Navidrome 服务，不提供公共音乐搜索能力。

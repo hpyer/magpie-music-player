@@ -4,12 +4,12 @@
       "id": "cn.hpyer.magpie.navidrome",
       "name": "Navidrome",
       "directory": "plugins/navidrome",
-      "version": "1.0.0",
-      "description": "连接 Navidrome 或兼容 Subsonic API 的服务，提供远程播放列表和媒体地址解析能力。",
-      "releaseFile": "cn.hpyer.magpie.navidrome-1.0.0.zip",
+      "version": "1.0.1",
+      "description": "连接 Navidrome 或兼容 Subsonic API 的服务，提供远程播放列表、媒体地址解析和歌词读取能力。",
+      "releaseFile": "cn.hpyer.magpie.navidrome-1.0.1.zip",
       "downloads": {
-        "github": "https://raw.githubusercontent.com/hpyer/magpie-music-player/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.0.zip",
-        "gitee": "https://gitee.com/Hpyer/magpie-music-player/raw/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.0.zip"
+        "github": "https://raw.githubusercontent.com/hpyer/magpie-music-player/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.1.zip",
+        "gitee": "https://gitee.com/Hpyer/magpie-music-player/raw/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.1.zip"
       }
     }
   ]
