@@ -36,7 +36,7 @@ import { AppSettings, InstalledPluginSetting, ShortcutSetting, createDefaultAppS
 import { configureMediaAssetCache } from './store/mediaAssetCache';
 import { usePlayerStore } from './store/playerStore';
 import { usePlaylistStore } from './store/playlistStore';
-import { LyricSearchResult, MediaItem, PlaylistType, PluginConfigField, PluginPlaylistItem, SongInfoSearchResult } from './types/plugin';
+import { LyricSearchResult, MediaItem, Playlist, PlaylistType, PluginConfigField, PluginPlaylistItem, SongInfoSearchResult } from './types/plugin';
 import type {
   CacheFileEntry,
   CacheGroupId,
@@ -283,7 +283,17 @@ const playlistTypeOptions = computed<Array<{ value: PlaylistFormType; label: str
     label: plugin.name,
   })),
 ]);
-const playlistSelectOptions = computed<AppSelectOption[]>(() => playlistStore.playlists.map(playlist => ({
+const enabledPluginIds = computed(() => new Set(
+  settingsStore.settings.plugins
+    .filter(plugin => plugin.enabled && !plugin.blocked)
+    .map(plugin => plugin.id),
+));
+const isPlaylistSelectable = (playlist: Playlist) => (
+  playlist.type !== 'plugin-playlist'
+  || Boolean(playlist.pluginPlaylist?.pluginId && enabledPluginIds.value.has(playlist.pluginPlaylist.pluginId))
+);
+const selectablePlaylists = computed(() => playlistStore.playlists.filter(isPlaylistSelectable));
+const playlistSelectOptions = computed<AppSelectOption[]>(() => selectablePlaylists.value.map(playlist => ({
   value: playlist.id,
   label: playlist.name,
   meta: `(${playlist.songs.length})`,
@@ -648,6 +658,16 @@ watch(() => playlistStore.currentPlaylistId, () => {
   });
   void persistPlaybackSession();
 });
+watch([() => playlistStore.currentPlaylistId, selectablePlaylists], () => {
+  const currentPlaylist = playlistStore.currentPlaylist;
+  if (!currentPlaylist || isPlaylistSelectable(currentPlaylist)) return;
+
+  const nextPlaylist = selectablePlaylists.value[0] ?? null;
+  playlistStore.currentPlaylistId = nextPlaylist?.id ?? null;
+  clearShuffleQueue();
+  playbackShouldResume.value = false;
+  playerStore.select(nextPlaylist?.songs[0] ?? null);
+});
 watch([
   () => playerStore.currentMedia?.id,
   () => playerStore.isPlaying,
@@ -990,7 +1010,9 @@ const restorePlaybackSession = async (session: PlaybackSession) => {
     wasPlaying: session.wasPlaying,
   });
 
-  if (session.currentPlaylistId && playlistStore.playlists.some(playlist => playlist.id === session.currentPlaylistId)) {
+  if (session.currentPlaylistId && playlistStore.playlists.some(playlist => (
+    playlist.id === session.currentPlaylistId && isPlaylistSelectable(playlist)
+  ))) {
     playlistStore.currentPlaylistId = session.currentPlaylistId;
   }
 
@@ -1004,7 +1026,9 @@ const restorePlaybackSession = async (session: PlaybackSession) => {
   let song = playlist?.songs.find(matchesSessionSong);
 
   if (!song && (session.currentSongId || session.currentSongPath || session.currentSongUrl)) {
-    const playlistWithSong = playlistStore.playlists.find(item => item.songs.some(matchesSessionSong));
+    const playlistWithSong = playlistStore.playlists.find(item => (
+      isPlaylistSelectable(item) && item.songs.some(matchesSessionSong)
+    ));
     if (playlistWithSong) {
       playlistStore.currentPlaylistId = playlistWithSong.id;
       playlist = playlistWithSong;
@@ -1337,7 +1361,7 @@ const scanCurrentPlaylist = async () => {
 
 const switchPlaylist = (playlistId: string) => {
   const playlist = playlistStore.playlists.find(item => item.id === playlistId);
-  if (!playlist) return;
+  if (!playlist || !isPlaylistSelectable(playlist)) return;
 
   playlistStore.currentPlaylistId = playlistId;
   clearShuffleQueue();
