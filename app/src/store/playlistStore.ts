@@ -108,7 +108,7 @@ export const usePlaylistStore = defineStore('playlist', {
   },
   actions: {
     async initialize(options: { hydrateMediaAssets?: boolean } = {}) {
-      const shouldHydrateMediaAssets = options.hydrateMediaAssets ?? true;
+      const shouldHydrateMediaAssets = options.hydrateMediaAssets ?? false;
 
       try {
         const fileState = await readJsonFile<PlaylistStateFile>(PLAYLIST_STATE_PATH, {});

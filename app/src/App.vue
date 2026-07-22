@@ -133,10 +133,10 @@ const lyricSearchArtist = ref('');
 const activeLyricSearchPluginId = ref('');
 const lyricSearchResultsByPlugin = ref<Record<string, Array<LyricSearchResult & { pluginId: string }>>>({});
 const lyricPluginLoadingIds = ref(new Set<string>());
-const remoteCoverLoadingKeys = ref(new Set<string>());
-const remoteCoverAttemptedKeys = ref(new Set<string>());
-const remoteLyricLoadingKeys = ref(new Set<string>());
-const remoteLyricAttemptedKeys = ref(new Set<string>());
+const coverLoadingKeys = ref(new Set<string>());
+const coverAttemptedKeys = ref(new Set<string>());
+const lyricLoadingKeys = ref(new Set<string>());
+const lyricAttemptedKeys = ref(new Set<string>());
 const isSearchingSongInfo = ref(false);
 const isApplyingSongInfoSearchResult = ref(false);
 const songInfoSearchSong = ref<MediaItem | null>(null);
@@ -1243,18 +1243,6 @@ onMounted(async () => {
     });
   });
 
-  const hydrateMediaAssetsTask = (async () => {
-    if (!playlistStore.playlists.length) return;
-
-    try {
-      await playlistStore.hydrateMediaAssets();
-      await playlistStore.cacheInlineMediaAssets();
-      await playlistStore.save();
-    } catch (error) {
-      console.warn('[App] Failed to hydrate media assets after startup:', error);
-    }
-  })();
-
   const startupDir = playlistStore.currentPlaylist?.localDir ?? playlistStore.localMusicDir;
   let scanStartupTask: Promise<void> | null = null;
   if (startupDir && (!playlistStore.currentPlaylist || playlistStore.currentPlaylist.songs.length === 0)) {
@@ -1278,8 +1266,6 @@ onMounted(async () => {
         isPlaybackSessionRestorePending = false;
       });
   }
-
-  void hydrateMediaAssetsTask;
 });
 
 onBeforeUnmount(() => {
@@ -1739,7 +1725,7 @@ const writeSongLyric = async (song: MediaItem, lyric: string) => {
   }
 };
 
-const remoteMediaAssetKey = (song: MediaItem) => `${song.sourceId}:${song.id}`;
+const mediaAssetKey = (song: MediaItem) => `${song.sourceId}:${song.id}`;
 
 const syncCurrentMediaAssets = (song: MediaItem, assets: Pick<MediaItem, 'cover' | 'lyric'>) => {
   if (playerStore.currentMedia?.id !== song.id || playerStore.currentMedia.sourceId !== song.sourceId) return;
@@ -1747,16 +1733,13 @@ const syncCurrentMediaAssets = (song: MediaItem, assets: Pick<MediaItem, 'cover'
   if (assets.lyric) playerStore.currentMedia.lyric = assets.lyric;
 };
 
-const loadRemoteSongLyric = async (song: MediaItem | null) => {
-  if (!song || song.sourceId === LOCAL_MUSIC_SOURCE_ID || song.lyric?.trim()) return;
+const loadSongLyric = async (song: MediaItem | null) => {
+  if (!song || song.lyric?.trim()) return;
 
-  const plugin = pluginManager.getPlugin(song.sourceId);
-  if (!plugin?.getMediaLyric) return;
+  const key = mediaAssetKey(song);
+  if (lyricLoadingKeys.value.has(key)) return;
 
-  const key = remoteMediaAssetKey(song);
-  if (remoteLyricLoadingKeys.value.has(key)) return;
-
-  remoteLyricLoadingKeys.value = new Set(remoteLyricLoadingKeys.value).add(key);
+  lyricLoadingKeys.value = new Set(lyricLoadingKeys.value).add(key);
   try {
     const cachedAssets = await loadMediaAssets(song.id);
     if (!song.lyric && cachedAssets?.lyric) {
@@ -1764,21 +1747,24 @@ const loadRemoteSongLyric = async (song: MediaItem | null) => {
       syncCurrentMediaAssets(song, { lyric: cachedAssets.lyric });
       return;
     }
-    if (remoteLyricAttemptedKeys.value.has(key)) return;
+    if (lyricAttemptedKeys.value.has(key)) return;
 
-    remoteLyricAttemptedKeys.value = new Set(remoteLyricAttemptedKeys.value).add(key);
-    const lyric = await plugin.getMediaLyric(song.id);
+    lyricAttemptedKeys.value = new Set(lyricAttemptedKeys.value).add(key);
+    const lyric = song.sourceId === LOCAL_MUSIC_SOURCE_ID
+      ? (await localMusicService.readEmbeddedMediaAssets(song)).lyric
+      : await pluginManager.getPlugin(song.sourceId)?.getMediaLyric?.(song.id);
     if (lyric?.trim()) {
       song.lyric = lyric;
       syncCurrentMediaAssets(song, { lyric });
-      await writeSongLyric(song, lyric);
+      await playlistStore.updateSongLyric(song.id, lyric);
+      await enforceCacheGroupLimit('lyrics');
     }
   } catch (error) {
-    console.warn('[App] Failed to load remote song lyric:', error);
+    console.warn('[App] Failed to load song lyric asset:', error);
   } finally {
-    const nextLoadingKeys = new Set(remoteLyricLoadingKeys.value);
+    const nextLoadingKeys = new Set(lyricLoadingKeys.value);
     nextLoadingKeys.delete(key);
-    remoteLyricLoadingKeys.value = nextLoadingKeys;
+    lyricLoadingKeys.value = nextLoadingKeys;
   }
 };
 
@@ -1804,16 +1790,13 @@ const writeSongInfo = async (song: MediaItem, info: Partial<Pick<MediaItem, 'tit
   }
 };
 
-const loadRemoteSongCover = async (song: MediaItem) => {
-  if (song.sourceId === LOCAL_MUSIC_SOURCE_ID || song.cover) return;
+const loadSongCover = async (song: MediaItem) => {
+  if (song.cover) return;
 
-  const plugin = pluginManager.getPlugin(song.sourceId);
-  if (!plugin?.getMediaCover) return;
+  const key = mediaAssetKey(song);
+  if (coverLoadingKeys.value.has(key)) return;
 
-  const key = remoteMediaAssetKey(song);
-  if (remoteCoverLoadingKeys.value.has(key)) return;
-
-  remoteCoverLoadingKeys.value = new Set(remoteCoverLoadingKeys.value).add(key);
+  coverLoadingKeys.value = new Set(coverLoadingKeys.value).add(key);
   try {
     const cachedAssets = await loadMediaAssets(song.id);
     if (!song.cover && cachedAssets?.cover) {
@@ -1821,43 +1804,46 @@ const loadRemoteSongCover = async (song: MediaItem) => {
       syncCurrentMediaAssets(song, { cover: cachedAssets.cover });
       return;
     }
-    if (remoteCoverAttemptedKeys.value.has(key)) return;
+    if (coverAttemptedKeys.value.has(key)) return;
 
-    remoteCoverAttemptedKeys.value = new Set(remoteCoverAttemptedKeys.value).add(key);
-    const cover = await plugin.getMediaCover(song.id);
+    coverAttemptedKeys.value = new Set(coverAttemptedKeys.value).add(key);
+    const cover = song.sourceId === LOCAL_MUSIC_SOURCE_ID
+      ? (await localMusicService.readEmbeddedMediaAssets(song)).cover
+      : await pluginManager.getPlugin(song.sourceId)?.getMediaCover?.(song.id);
     if (!cover) return;
 
     song.cover = cover;
     syncCurrentMediaAssets(song, { cover });
-    await writeSongInfo(song, { cover });
+    await playlistStore.updateSongCover(song.id, cover);
+    await enforceCacheGroupLimit('covers');
   } catch (error) {
-    console.warn('[App] Failed to load remote song cover:', error);
+    console.warn('[App] Failed to load song cover asset:', error);
   } finally {
-    const nextLoadingKeys = new Set(remoteCoverLoadingKeys.value);
+    const nextLoadingKeys = new Set(coverLoadingKeys.value);
     nextLoadingKeys.delete(key);
-    remoteCoverLoadingKeys.value = nextLoadingKeys;
+    coverLoadingKeys.value = nextLoadingKeys;
   }
 };
 
-const loadRemotePlaylistCovers = async (playlist = currentPlaylist.value) => {
-  if (!playlist || playlist.type !== 'plugin-playlist') return;
+const loadVisiblePlaylistCovers = async (playlist = currentPlaylist.value) => {
+  if (!playlist) return;
 
-  const songsNeedingCover = playlist.songs.filter(song => song.sourceId !== LOCAL_MUSIC_SOURCE_ID && !song.cover);
+  const songsNeedingCover = playlist.songs.filter(song => !song.cover);
   const batchSize = 6;
   for (let index = 0; index < songsNeedingCover.length; index += batchSize) {
     const batch = songsNeedingCover.slice(index, index + batchSize);
-    await Promise.allSettled(batch.map(loadRemoteSongCover));
+    await Promise.allSettled(batch.map(loadSongCover));
   }
 };
 
 watch([expandedPanel, songs], () => {
   if (expandedPanel.value !== 'playlist') return;
-  void loadRemotePlaylistCovers();
+  void loadVisiblePlaylistCovers();
 }, { flush: 'post', immediate: true });
 
 watch([() => currentSong.value?.sourceId, () => currentSong.value?.id, expandedPanel], () => {
   if (expandedPanel.value !== 'lyrics') return;
-  void loadRemoteSongLyric(currentSong.value);
+  void loadSongLyric(currentSong.value);
 });
 
 const openLyricSearchModal = async () => {
@@ -2629,7 +2615,7 @@ const submitPlaylistForm = async () => {
         isScanning.value = true;
         try {
           await playlistStore.refreshPluginPlaylist(playlist.id);
-          await loadRemotePlaylistCovers(playlist);
+          await loadVisiblePlaylistCovers(playlist);
         } finally {
           isScanning.value = false;
         }
@@ -2672,7 +2658,7 @@ const submitPlaylistForm = async () => {
       isScanning.value = true;
       try {
         await playlistStore.refreshPluginPlaylist(editingPlaylistId.value);
-        await loadRemotePlaylistCovers(playlistStore.playlists.find(item => item.id === editingPlaylistId.value));
+        await loadVisiblePlaylistCovers(playlistStore.playlists.find(item => item.id === editingPlaylistId.value));
       } finally {
         isScanning.value = false;
       }
