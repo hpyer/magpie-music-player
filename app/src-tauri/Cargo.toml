@@ -1,6 +1,6 @@
 [package]
 name = "MagpieMusicPlayer"
-version = "1.0.1"
+version = "1.0.2"
 description = "Magpie Music Player"
 authors = ["Hpyer"]
 edition = "2021"
