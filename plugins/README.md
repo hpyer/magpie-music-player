@@ -13,7 +13,7 @@ plugins/
 
 当前官方插件：
 
-- `navidrome`：连接 Navidrome 或兼容 Subsonic API 的服务，提供远程播放列表和媒体地址解析能力。
+- `navidrome`：连接 Navidrome 或兼容 Subsonic API 的服务，提供远程播放列表、媒体地址解析、封面读取和歌词读取能力。
 
 官方插件列表统一维护在：
 
@@ -177,7 +177,7 @@ export async function handleMessage(message: PluginMessage) {
 - `media:playlist`：读取远程播放列表。
 - `media:search`：搜索网络媒体。
 - `media:resolve-url`：解析媒体播放地址。
-- `media:lyrics`：搜索或读取歌词。
+- `media:lyrics`：搜索歌词或按媒体读取歌词。
 - `media:metadata`：读取或更新歌曲元数据。
 - `media:cover`：读取或更新封面。
 - `media:delete`：删除远程媒体。
@@ -197,8 +197,8 @@ export async function handleMessage(message: PluginMessage) {
 
 ```json
 {
-  "capabilities": ["playlist-source", "media-url"],
-  "permissions": ["media:playlist", "media:resolve-url", "network:request"]
+  "capabilities": ["playlist-source", "media-url", "media-lyrics", "media-cover"],
+  "permissions": ["media:playlist", "media:resolve-url", "media:lyrics", "media:cover", "network:request"]
 }
 ```
 
@@ -207,8 +207,7 @@ export async function handleMessage(message: PluginMessage) {
 ```ts
 type PlaylistSourceMessage =
   | { type: 'playlist.list' }
-  | { type: 'playlist.songs'; playlistId: string }
-  | { type: 'media.url'; mediaId: string };
+  | { type: 'playlist.songs'; playlistId: string };
 ```
 
 ### 音乐搜索
@@ -227,9 +226,32 @@ type PlaylistSourceMessage =
 消息：
 
 ```ts
-type MusicSearchMessage =
-  | { type: 'music.search'; query: string; page: number; limit: number }
-  | { type: 'media.url'; mediaId: string };
+type MusicSearchMessage = {
+  type: 'music.search';
+  query: string;
+  page: number;
+  limit: number;
+};
+```
+
+### 媒体资源读取
+
+适用于远程播放列表或搜索结果里的媒体资源补全。
+
+清单能力与权限：
+
+```json
+{
+  "capabilities": ["media-url", "media-lyrics", "media-cover"],
+  "permissions": ["media:resolve-url", "media:lyrics", "media:cover"]
+}
+```
+
+```ts
+type MediaResourceMessage =
+  | { type: 'media.url'; mediaId: string }
+  | { type: 'media.lyric'; mediaId: string }
+  | { type: 'media.cover'; mediaId: string };
 ```
 
 ### 歌词搜索

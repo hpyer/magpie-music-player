@@ -471,6 +471,18 @@ class PluginRuntimeService {
       };
     }
 
+    if (runtimePlugin.manifest.capabilities.includes('media-lyrics')) {
+      adapter.getMediaLyric = (mediaId: string) => (
+        host.sendMessage<string>({ type: 'media.lyric', mediaId })
+      );
+    }
+
+    if (runtimePlugin.manifest.capabilities.includes('media-cover')) {
+      adapter.getMediaCover = (mediaId: string) => (
+        host.sendMessage<string>({ type: 'media.cover', mediaId })
+      );
+    }
+
     if (runtimePlugin.manifest.capabilities.includes('media-delete')) {
       adapter.deleteMedia = (mediaId: string, context?: MediaDeleteContext) => (
         host.sendMessage<void>({ type: 'media.delete', mediaId, context })

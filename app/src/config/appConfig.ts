@@ -89,6 +89,8 @@ export const settingsTabs: Array<{ value: SettingsTab; label: string }> = [
 
 export const pluginCapabilityGroups: Array<{ label: string; capabilities: PluginCapability[] }> = [
   { label: '远程歌单', capabilities: ['playlist-source'] },
+  { label: '媒体歌词', capabilities: ['media-lyrics'] },
+  { label: '媒体封面', capabilities: ['media-cover'] },
   { label: '歌词搜索', capabilities: ['lyrics-search'] },
   { label: '歌曲信息搜索', capabilities: ['song-info-search'] },
   { label: '歌曲搜索', capabilities: ['search', 'music-search'] },

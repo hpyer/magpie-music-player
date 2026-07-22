@@ -10,6 +10,6 @@
   },
   "devDependencies": {
     "@magpie-music/plugin-cli": "^1.0.0",
-    "@magpie-music/plugin-types": "^1.0.0"
+    "@magpie-music/plugin-types": "^1.0.1"
   }
 }

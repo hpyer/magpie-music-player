@@ -235,6 +235,10 @@ export type PluginCapability =
   | 'music-search'
   /** 媒体播放地址解析能力。 */
   | 'media-url'
+  /** 按媒体 id 读取歌词能力。 */
+  | 'media-lyrics'
+  /** 按媒体 id 读取封面能力。 */
+  | 'media-cover'
   /** 远程媒体删除能力。 */
   | 'media-delete'
   /** 远程播放列表来源能力。 */
@@ -382,6 +386,20 @@ export type MediaUrlMessage = {
   mediaId: string;
 };
 
+/** 媒体歌词读取消息，返回歌词正文。 */
+export type MediaLyricMessage = {
+  type: 'media.lyric';
+  /** 插件内部的媒体 id。 */
+  mediaId: string;
+};
+
+/** 媒体封面读取消息，返回封面地址或数据 URL。 */
+export type MediaCoverMessage = {
+  type: 'media.cover';
+  /** 插件内部的媒体 id。 */
+  mediaId: string;
+};
+
 /** 删除远程媒体消息。 */
 export type MediaDeleteMessage = {
   type: 'media.delete';
@@ -400,6 +418,8 @@ export type PluginMessage =
   | LyricsSearchMessage
   | SongInfoSearchMessage
   | MediaUrlMessage
+  | MediaLyricMessage
+  | MediaCoverMessage
   | MediaDeleteMessage;
 
 /** 主应用内部注册插件时保存的记录。 */
@@ -468,8 +488,8 @@ export interface Plugin {
   deleteMedia?(mediaId: string, context?: MediaDeleteContext): Promise<void>;
   /** 获取媒体歌词。 */
   getMediaLyric?(mediaId: string): Promise<string>;
-  /** 获取媒体详情。 */
-  getMediaDetail?(mediaId: string): Promise<MediaItem>;
+  /** 获取媒体封面地址或数据 URL。 */
+  getMediaCover?(mediaId: string): Promise<string>;
 
   /** 搜索歌词。 */
   searchLyrics?(context: LyricSearchContext): Promise<LyricSearchResult[]>;
