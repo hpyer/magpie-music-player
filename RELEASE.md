@@ -16,8 +16,8 @@
 
 Git remote：
 
-- `github` 指向 `https://github.com/hpyer/magpie-music-player.git`
-- `gitee` 指向 `https://gitee.com/Hpyer/magpie-music-player.git`
+- `origin` 指向 `git@github.com:hpyer/magpie-music-player.git`
+- `gitee` 指向 `git@gitee.com:Hpyer/magpie-music-player.git`
 
 GitHub Actions：
 
@@ -33,7 +33,7 @@ GitHub Actions：
 
 ```bash
 git status --short
-git pull github main
+git pull origin main
 ```
 
 安装依赖并运行基础构建：
@@ -188,8 +188,8 @@ git commit -m "Release app v1.2.0"
 
 ```bash
 git tag v1.2.0
-git push github main
-git push github v1.2.0
+git push origin main
+git push origin v1.2.0
 ```
 
 7. GitHub Actions 会运行：
@@ -246,8 +246,8 @@ git commit -m "Release plugin types v1.2.0"
 
 ```bash
 git tag plugin-types-v1.2.0
-git push github main
-git push github plugin-types-v1.2.0
+git push origin main
+git push origin plugin-types-v1.2.0
 ```
 
 6. GitHub Actions 会运行：
@@ -312,8 +312,8 @@ git commit -m "Release plugin CLI v1.2.0"
 
 ```bash
 git tag plugin-cli-v1.2.0
-git push github main
-git push github plugin-cli-v1.2.0
+git push origin main
+git push origin plugin-cli-v1.2.0
 ```
 
 7. GitHub Actions 会构建并发布 `@magpie-music/plugin-cli` 到 npm。
