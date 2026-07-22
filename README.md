@@ -8,7 +8,7 @@ Magpie Music Player 是一个本地优先的桌面音乐播放器，基于 Tauri
 
 <p align="center">
   <a href="./screenshots/app.png">
-    <img src="./screenshots/app.png" alt="Magpie Music Player 主界面" width="560">
+    <img src="./screenshots/app.png" alt="Magpie Music Player 主界面" width="460">
   </a>
 </p>
 
