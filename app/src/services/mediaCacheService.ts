@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { exists, mkdir, readDir, remove, stat, writeFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, open, readDir, remove, rename, stat } from '@tauri-apps/plugin-fs';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import type { MediaItem } from '../types/plugin';
 
@@ -13,6 +13,16 @@ interface CacheEntry {
   path: string;
   size: number;
   mtime: number;
+}
+
+export interface MediaCacheProgress {
+  key: string;
+  mediaId: string;
+  sourceId: string;
+  state: 'downloading' | 'complete' | 'error';
+  receivedBytes: number;
+  totalBytes: number | null;
+  progress: number;
 }
 
 const DEFAULT_LIMIT_BYTES = 1024 * 1024 * 1024;
@@ -38,9 +48,74 @@ const extensionFromUrl = (url: string) => {
   }
 };
 
+const extensionFromContentType = (contentType: string) => {
+  const normalized = contentType.toLowerCase().split(';')[0].trim();
+  switch (normalized) {
+    case 'audio/flac':
+    case 'audio/x-flac':
+      return 'flac';
+    case 'audio/mp4':
+    case 'audio/aac':
+      return 'm4a';
+    case 'audio/ogg':
+    case 'audio/opus':
+      return 'ogg';
+    case 'audio/wav':
+    case 'audio/x-wav':
+      return 'wav';
+    case 'audio/mpeg':
+    case 'audio/mp3':
+      return 'mp3';
+    default:
+      return '';
+  }
+};
+
+const cleanExtension = (value: unknown) => (
+  typeof value === 'string' && /^[a-z0-9]{2,5}$/i.test(value)
+    ? value.toLowerCase()
+    : ''
+);
+
+const extensionFromMedia = (media: MediaItem, url: string) => (
+  cleanExtension(media.extra?.suffix)
+  || extensionFromContentType(typeof media.extra?.contentType === 'string' ? media.extra.contentType : '')
+  || extensionFromUrl(url)
+);
+
 const pathJoin = (dir: string, child: string) => {
   const separator = dir.includes('\\') ? '\\' : '/';
   return `${dir.replace(/[\\/]+$/, '')}${separator}${child}`;
+};
+
+const mediaProgressKey = (media: MediaItem) => `${media.sourceId}:${media.id}`;
+
+const extraValue = (media: MediaItem, key: string) => {
+  const value = media.extra?.[key];
+  return typeof value === 'string' || typeof value === 'number' ? value : undefined;
+};
+
+const contentFingerprint = (media: MediaItem, url: string) => {
+  const values = [
+    extraValue(media, 'cacheKey'),
+    extraValue(media, 'cacheVersion'),
+    extraValue(media, 'etag'),
+    extraValue(media, 'lastModified'),
+    extraValue(media, 'size'),
+    extraValue(media, 'contentLength'),
+    extraValue(media, 'contentType'),
+    extraValue(media, 'suffix'),
+    media.duration,
+  ].filter(value => value !== undefined && value !== '');
+
+  if (values.length) return values.join(':');
+
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
 };
 
 class MediaCacheService {
@@ -49,6 +124,9 @@ class MediaCacheService {
     limitBytes: DEFAULT_LIMIT_BYTES,
     allowedSourceIds: [],
   };
+
+  private cacheTasks = new Map<string, Promise<string>>();
+  private listeners = new Set<(progress: MediaCacheProgress) => void>();
 
   configure(config: Partial<MediaCacheConfig>) {
     this.config = {
@@ -63,12 +141,34 @@ class MediaCacheService {
     return this.config.allowedSourceIds.includes(media.sourceId);
   }
 
+  subscribe(listener: (progress: MediaCacheProgress) => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  progressKey(media: MediaItem) {
+    return mediaProgressKey(media);
+  }
+
   async resolvePlayableUrl(media: MediaItem, url?: string) {
     if (!url || !isRemoteUrl(url)) return url;
     if (!this.config.cacheDir || !this.canCacheMedia(media)) return url;
 
-    const cachePath = await this.ensureCached(media, url);
-    return convertFileSrc(cachePath);
+    const cachePath = this.cacheFilePath(media, url);
+    if (await exists(cachePath)) {
+      this.emitProgress(media, {
+        state: 'complete',
+        receivedBytes: 1,
+        totalBytes: 1,
+        progress: 1,
+      });
+      return convertFileSrc(cachePath);
+    }
+
+    void this.ensureCached(media, url).catch(error => {
+      console.warn('[MediaCache] Background cache failed:', error);
+    });
+    return url;
   }
 
   async cacheMedia(media: MediaItem, url = media.url) {
@@ -87,9 +187,33 @@ class MediaCacheService {
   }
 
   private cacheFilePath(media: MediaItem, url: string) {
-    const extension = extensionFromUrl(url);
-    const id = hashString(`${media.sourceId}:${media.id}:${url}`);
+    const extension = extensionFromMedia(media, url);
+    const id = hashString(`${media.sourceId}:${media.id}:${contentFingerprint(media, url)}`);
     return pathJoin(this.config.cacheDir, `${id}.${extension}`);
+  }
+
+  private tempCacheFilePath(media: MediaItem, url: string) {
+    return `${this.cacheFilePath(media, url)}.part`;
+  }
+
+  private emitProgress(media: MediaItem, progress: Omit<MediaCacheProgress, 'key' | 'mediaId' | 'sourceId'>) {
+    const event = {
+      key: mediaProgressKey(media),
+      mediaId: media.id,
+      sourceId: media.sourceId,
+      ...progress,
+    };
+    this.listeners.forEach(listener => listener(event));
+  }
+
+  private async removeIfExists(path: string) {
+    try {
+      if (await exists(path)) {
+        await remove(path);
+      }
+    } catch (error) {
+      console.warn(`[MediaCache] Failed to remove cache file ${path}:`, error);
+    }
   }
 
   private async ensureCached(media: MediaItem, url: string) {
@@ -97,18 +221,100 @@ class MediaCacheService {
 
     const cachePath = this.cacheFilePath(media, url);
     if (await exists(cachePath)) {
+      this.emitProgress(media, {
+        state: 'complete',
+        receivedBytes: 1,
+        totalBytes: 1,
+        progress: 1,
+      });
       return cachePath;
     }
 
-    const response = await tauriFetch(url, { connectTimeout: 15000 });
-    if (!response.ok) {
-      throw new Error(`Failed to cache media: ${response.status} ${response.statusText}`);
-    }
+    const existingTask = this.cacheTasks.get(cachePath);
+    if (existingTask) return existingTask;
 
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    await writeFile(cachePath, bytes);
-    await this.cleanup();
-    return cachePath;
+    const task = this.downloadToCache(media, url, cachePath)
+      .finally(() => {
+        this.cacheTasks.delete(cachePath);
+      });
+    this.cacheTasks.set(cachePath, task);
+    return task;
+  }
+
+  private async downloadToCache(media: MediaItem, url: string, cachePath: string) {
+    const tempPath = this.tempCacheFilePath(media, url);
+    await this.removeIfExists(tempPath);
+
+    let file: Awaited<ReturnType<typeof open>> | null = null;
+    let receivedBytes = 0;
+    let totalBytes: number | null = null;
+
+    try {
+      const response = await tauriFetch(url, { connectTimeout: 15000 });
+      if (!response.ok) {
+        throw new Error(`Failed to cache media: ${response.status} ${response.statusText}`);
+      }
+
+      const contentLength = Number(response.headers.get('content-length'));
+      totalBytes = Number.isFinite(contentLength) && contentLength > 0 ? contentLength : null;
+      this.emitProgress(media, {
+        state: 'downloading',
+        receivedBytes,
+        totalBytes,
+        progress: 0,
+      });
+
+      if (!response.body) {
+        throw new Error('Failed to cache media: response body is empty.');
+      }
+
+      const reader = response.body.getReader();
+      file = await open(tempPath, { write: true, create: true, truncate: true });
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value?.byteLength) continue;
+
+        await file.write(value);
+        receivedBytes += value.byteLength;
+        this.emitProgress(media, {
+          state: 'downloading',
+          receivedBytes,
+          totalBytes,
+          progress: totalBytes ? Math.min(1, receivedBytes / totalBytes) : 0,
+        });
+      }
+
+      await file.close();
+      file = null;
+
+      await rename(tempPath, cachePath);
+      this.emitProgress(media, {
+        state: 'complete',
+        receivedBytes,
+        totalBytes: totalBytes ?? receivedBytes,
+        progress: 1,
+      });
+      await this.cleanup();
+      return cachePath;
+    } catch (error) {
+      if (file) {
+        try {
+          await file.close();
+        } catch {
+          // Ignore close failures while reporting the original cache error.
+        }
+      }
+      await this.removeIfExists(tempPath);
+      this.emitProgress(media, {
+        state: 'error',
+        receivedBytes,
+        totalBytes,
+        progress: 0,
+      });
+      throw error;
+    }
   }
 
   private async listCacheEntries() {
@@ -120,6 +326,7 @@ class MediaCacheService {
 
       for (const entry of dirEntries) {
         if (!entry.isFile) continue;
+        if (entry.name.endsWith('.part')) continue;
 
         const fullPath = pathJoin(this.config.cacheDir, entry.name);
         const info = await stat(fullPath);

@@ -394,6 +394,7 @@ html[data-platform="windows"] .search-plugin-layout {
 }
 
 .progress-slider {
+  --cache-track-soft: var(--theme-cache-track-soft, rgba(0, 0, 0, 0.14));
   width: 100%;
   height: 18px;
   margin: 0;
@@ -409,7 +410,19 @@ html[data-platform="windows"] .search-plugin-layout {
 .progress-slider::-webkit-slider-runnable-track {
   height: 5px;
   border-radius: 999px;
+  border: 0;
+  box-sizing: border-box;
   background: linear-gradient(to right, var(--theme-control) 0 var(--progress), var(--theme-range-track) var(--progress) 100%);
+}
+
+.progress-slider[data-cache-state="empty"]::-webkit-slider-runnable-track {
+  background: var(--cache-track-soft);
+}
+
+.progress-slider[data-cache-state="downloading"]::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(to right, var(--cache-track-soft) 0 var(--cache-progress), transparent var(--cache-progress) 100%),
+    var(--cache-track-soft);
 }
 
 .progress-slider::-webkit-slider-thumb {

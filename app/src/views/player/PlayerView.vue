@@ -13,6 +13,8 @@ defineProps<{
   addIcon: string;
   albumLine: string;
   appName: string;
+  cacheProgressPercent: number;
+  cacheTrackState: 'default' | 'empty' | 'downloading' | 'complete';
   closeIcon: string;
   currentSong: MediaItem | null;
   currentSongIsFavorite: boolean;
@@ -142,7 +144,9 @@ const formatTime = (seconds?: number) => {
           min="0"
           :max="displayedDuration"
           :value="displayedCurrentTime"
-          :style="{ '--progress': `${progressPercent}%` }"
+          :style="{ '--progress': `${progressPercent}%`, '--cache-progress': `${cacheProgressPercent}%` }"
+          :data-cache-state="cacheTrackState"
+          :title="cacheProgressPercent > 0 && cacheProgressPercent < 100 ? `缓存 ${Math.round(cacheProgressPercent)}%` : undefined"
           :disabled="!currentSong"
           aria-label="播放进度"
           @input="$emit('handle-seek', $event)"

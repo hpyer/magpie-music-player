@@ -17,6 +17,7 @@ export interface ThemeOption {
   mutedInk: string;
   control: string;
   controlInk: string;
+  cacheTrackSoft?: string;
   iconFilter?: string;
   playIconFilter?: string;
   rangeTrack?: string;

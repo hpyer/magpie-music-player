@@ -68,6 +68,7 @@ export const themeOptions: ThemeOption[] = [
     iconFilter: 'brightness(0) invert(1)',
     playIconFilter: 'brightness(0) saturate(100%)',
     rangeTrack: 'rgba(255, 255, 255, 0.28)',
+    cacheTrackSoft: 'rgba(244, 240, 232, 0.16)',
     line: 'rgba(255, 255, 255, 0.18)',
     panelHeader: 'rgba(255, 255, 255, 0.08)',
     field: 'rgba(255, 255, 255, 0.1)',

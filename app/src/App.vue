@@ -26,7 +26,7 @@ import { PLUGIN_PACKAGE_EXTENSION } from './core/pluginRuntime';
 import { clearGlobalShortcuts, syncGlobalShortcuts } from './services/globalShortcutService';
 import { appLogError, appLogInfo, appLogWarn, errorToLogDetails, initializeAppLogger, revealAppDataDirectory } from './services/appLogger';
 import { LOCAL_MUSIC_SOURCE_ID, localMusicService } from './services/localMusicService';
-import { mediaCacheService } from './services/mediaCacheService';
+import { mediaCacheService, type MediaCacheProgress } from './services/mediaCacheService';
 import { pluginBlocklistService } from './services/pluginBlocklistService';
 import { pluginInstallerService } from './services/pluginInstallerService';
 import { pluginRuntimeService } from './services/pluginRuntimeService';
@@ -146,6 +146,7 @@ const isSearchingNetworkMusic = ref(false);
 const activeMusicSearchPluginId = ref('');
 const networkSearchResultsByPlugin = ref<Record<string, MediaItem[]>>({});
 const isCachingNetworkSongId = ref<string | null>(null);
+const mediaCacheProgressByKey = ref<Record<string, MediaCacheProgress>>({});
 const isMacOs = ref(false);
 const startupFallbackMessage = ref('');
 const {
@@ -165,6 +166,7 @@ let playbackSessionTimer: number | undefined;
 let stopEndedListener: (() => void) | undefined;
 let stopCloseRequestedListener: (() => void) | undefined;
 let stopDragDropListener: (() => void) | undefined;
+let stopMediaCacheProgressListener: (() => void) | undefined;
 let isClosingWindow = false;
 let closeAfterPersistTask: Promise<void> | null = null;
 let isPlaybackSessionRestorePending = true;
@@ -226,6 +228,24 @@ const displayedDuration = computed(() => {
 const progressPercent = computed(() => {
   if (!displayedDuration.value || Number.isNaN(displayedDuration.value)) return 0;
   return Math.min(100, (displayedCurrentTime.value / displayedDuration.value) * 100);
+});
+const currentMediaCacheProgress = computed(() => {
+  if (!currentSong.value) return null;
+  return mediaCacheProgressByKey.value[mediaCacheService.progressKey(currentSong.value)] ?? null;
+});
+const cacheProgressPercent = computed(() => {
+  const progress = currentMediaCacheProgress.value;
+  if (!progress || progress.state !== 'downloading') return 0;
+  return Math.min(100, Math.max(0, progress.progress * 100));
+});
+const cacheTrackState = computed(() => {
+  const song = currentSong.value;
+  if (!song || !mediaCacheService.canCacheMedia(song)) return 'default';
+
+  const progress = currentMediaCacheProgress.value;
+  if (progress?.state === 'complete') return 'complete';
+  if (progress?.state === 'downloading') return 'downloading';
+  return 'empty';
 });
 const albumLine = computed(() => {
   if (!currentSong.value) return 'Artist Name • Album Name';
@@ -334,6 +354,7 @@ const surfaceThemeStyle = computed(() => ({
   '--theme-muted-ink': activeTheme.value.mutedInk,
   '--theme-control': activeTheme.value.control,
   '--theme-control-ink': activeTheme.value.controlInk,
+  '--theme-cache-track-soft': activeTheme.value.cacheTrackSoft ?? 'rgba(0, 0, 0, 0.14)',
   '--theme-icon-filter': activeTheme.value.iconFilter ?? 'brightness(0) saturate(100%)',
   '--theme-play-icon-filter': activeTheme.value.playIconFilter ?? 'brightness(0) invert(1)',
   '--theme-range-track': activeTheme.value.rangeTrack ?? 'rgba(0, 0, 0, 0.28)',
@@ -1061,6 +1082,16 @@ onMounted(async () => {
   }
 
   syncMediaCacheConfig();
+  stopMediaCacheProgressListener = mediaCacheService.subscribe(progress => {
+    mediaCacheProgressByKey.value = {
+      ...mediaCacheProgressByKey.value,
+      [progress.key]: progress,
+    };
+
+    if (progress.state === 'complete') {
+      void refreshCacheUsage();
+    }
+  });
   void ensureConfiguredCacheDirectories().catch(error => {
     console.warn('[App] Failed to create cache directories after startup:', error);
   });
@@ -1237,6 +1268,7 @@ onBeforeUnmount(() => {
   stopEndedListener?.();
   stopCloseRequestedListener?.();
   stopDragDropListener?.();
+  stopMediaCacheProgressListener?.();
   void clearGlobalShortcuts();
   pluginRuntimeService.stopAll();
   window.removeEventListener('keydown', handleWindowShortcut);
@@ -2557,6 +2589,8 @@ const submitPlaylistForm = async () => {
     :album-line="albumLine"
     :app-name="appName"
     :close-icon="closeIcon"
+    :cache-progress-percent="cacheProgressPercent"
+    :cache-track-state="cacheTrackState"
     :current-playlist-id="playlistStore.currentPlaylistId"
     :current-song="currentSong"
     :current-song-is-favorite="currentSongIsFavorite"
