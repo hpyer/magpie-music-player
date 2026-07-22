@@ -1741,7 +1741,7 @@ const loadSongLyric = async (song: MediaItem | null) => {
 
   lyricLoadingKeys.value = new Set(lyricLoadingKeys.value).add(key);
   try {
-    const cachedAssets = await loadMediaAssets(song.id);
+    const cachedAssets = await loadMediaAssets(song);
     if (!song.lyric && cachedAssets?.lyric) {
       song.lyric = cachedAssets.lyric;
       syncCurrentMediaAssets(song, { lyric: cachedAssets.lyric });
@@ -1798,7 +1798,7 @@ const loadSongCover = async (song: MediaItem) => {
 
   coverLoadingKeys.value = new Set(coverLoadingKeys.value).add(key);
   try {
-    const cachedAssets = await loadMediaAssets(song.id);
+    const cachedAssets = await loadMediaAssets(song);
     if (!song.cover && cachedAssets?.cover) {
       song.cover = cachedAssets.cover;
       syncCurrentMediaAssets(song, { cover: cachedAssets.cover });

@@ -220,7 +220,7 @@ export const usePlaylistStore = defineStore('playlist', {
           if (!song.lyric && embeddedAssets.lyric) song.lyric = embeddedAssets.lyric;
         }
 
-        const assets = await loadMediaAssets(song.id);
+        const assets = await loadMediaAssets(song);
         if (!assets) return;
 
         if (!song.cover && assets.cover) song.cover = assets.cover;
@@ -293,16 +293,17 @@ export const usePlaylistStore = defineStore('playlist', {
       });
 
       await runInBatches(playlist.songs, saveMediaAssets);
-      await Promise.allSettled(removedSongs.map(song => deleteMediaAssets(song.id)));
+      await Promise.allSettled(removedSongs.map(deleteMediaAssets));
       await this.save({ throwOnError: true });
     },
 
     async removeSongFromPlaylist(playlistId: string, songId: string) {
       const playlist = this.playlists.find(p => p.id === playlistId);
       if (playlist) {
+        const removedSongs = playlist.songs.filter(song => song.id === songId);
         playlist.songs = playlist.songs.filter(s => s.id !== songId);
         this.favoriteSongIds = this.favoriteSongIds.filter(id => id !== songId);
-        await deleteMediaAssets(songId);
+        await Promise.allSettled(removedSongs.map(deleteMediaAssets));
         await this.save({ throwOnError: true });
       }
     },
@@ -310,7 +311,7 @@ export const usePlaylistStore = defineStore('playlist', {
     async clearPlaylistSongs(playlistId: string) {
       const playlist = this.playlists.find(p => p.id === playlistId);
       if (playlist) {
-        await Promise.all(playlist.songs.map(song => deleteMediaAssets(song.id)));
+        await Promise.all(playlist.songs.map(deleteMediaAssets));
         playlist.songs = [];
         await this.save({ throwOnError: true });
       }
@@ -386,7 +387,7 @@ export const usePlaylistStore = defineStore('playlist', {
     async deletePlaylist(id: string) {
       const playlist = this.playlists.find(p => p.id === id);
       if (playlist) {
-        await Promise.all(playlist.songs.map(song => deleteMediaAssets(song.id)));
+        await Promise.all(playlist.songs.map(deleteMediaAssets));
         const removedSongIds = new Set(playlist.songs.map(song => song.id));
         this.favoriteSongIds = this.favoriteSongIds.filter(id => !removedSongIds.has(id));
       }

@@ -4,6 +4,7 @@ import { readJsonFile, removeStorageFile, storagePath, writeJsonFile } from './a
 
 interface MediaAssetRecord {
   id: string;
+  sourceId: string;
   cover?: string;
   lyric?: string;
   updatedAt: number;
@@ -17,10 +18,11 @@ const hashString = (value: string) => {
     hash = Math.imul(hash, 0x01000193);
   }
 
-  return (hash >>> 0).toString(36);
+  return (hash >>> 0).toString(16).padStart(8, '0');
 };
 
-const assetPath = (songId: string) => storagePath('media-assets', `${hashString(songId)}.json`);
+const cacheFileStem = (song: MediaItem) => hashString(`${song.sourceId}:${song.id}`);
+const assetPath = (song: MediaItem) => storagePath('media-assets', `${cacheFileStem(song)}.json`);
 let coverCacheDir = '';
 let lyricCacheDir = '';
 
@@ -29,12 +31,12 @@ const pathJoin = (dir: string, child: string) => {
   return `${dir.replace(/[\\/]+$/, '')}${separator}${child}`;
 };
 
-const coverPath = (songId: string) => (
-  coverCacheDir ? pathJoin(coverCacheDir, `${hashString(songId)}.txt`) : ''
+const coverPath = (song: MediaItem) => (
+  coverCacheDir ? pathJoin(coverCacheDir, `${cacheFileStem(song)}.cover`) : ''
 );
 
-const lyricPath = (songId: string) => (
-  lyricCacheDir ? pathJoin(lyricCacheDir, `${hashString(songId)}.lrc`) : ''
+const lyricPath = (song: MediaItem) => (
+  lyricCacheDir ? pathJoin(lyricCacheDir, `${cacheFileStem(song)}.lyric`) : ''
 );
 
 export const configureMediaAssetCache = (config: { coverDir?: string; lyricDir?: string }) => {
@@ -46,14 +48,14 @@ const saveCoverAsset = async (song: MediaItem) => {
   if (!song.cover || !coverCacheDir) return;
 
   await mkdir(coverCacheDir, { recursive: true });
-  await writeTextFile(coverPath(song.id), song.cover);
+  await writeTextFile(coverPath(song), song.cover);
 };
 
 const saveLyricAsset = async (song: MediaItem) => {
   if (!song.lyric || !lyricCacheDir) return;
 
   await mkdir(lyricCacheDir, { recursive: true });
-  await writeTextFile(lyricPath(song.id), song.lyric);
+  await writeTextFile(lyricPath(song), song.lyric);
 };
 
 const loadTextAsset = async (path: string) => {
@@ -67,6 +69,16 @@ const loadTextAsset = async (path: string) => {
   }
 };
 
+const removeIfExists = async (path: string) => {
+  try {
+    if (path && await exists(path)) {
+      await remove(path);
+    }
+  } catch {
+    // Ignore cache cleanup failures.
+  }
+};
+
 export const saveMediaAssets = async (song: MediaItem) => {
   if (!song.cover && !song.lyric) return;
 
@@ -75,38 +87,34 @@ export const saveMediaAssets = async (song: MediaItem) => {
 
   const record: MediaAssetRecord = {
     id: song.id,
+    sourceId: song.sourceId,
     cover: coverCacheDir ? undefined : song.cover,
     lyric: lyricCacheDir ? undefined : song.lyric,
     updatedAt: Date.now(),
   };
 
-  await writeJsonFile(assetPath(song.id), record);
+  await writeJsonFile(assetPath(song), record);
 };
 
-export const loadMediaAssets = async (songId: string) => {
-  const record = await readJsonFile<MediaAssetRecord | null>(assetPath(songId), null);
-  const cover = await loadTextAsset(coverPath(songId));
-  const lyric = await loadTextAsset(lyricPath(songId));
-  if (record?.id === songId) {
+export const loadMediaAssets = async (song: MediaItem) => {
+  const record = await readJsonFile<MediaAssetRecord | null>(assetPath(song), null);
+  const cover = await loadTextAsset(coverPath(song));
+  const lyric = await loadTextAsset(lyricPath(song));
+  if (record?.id === song.id && record.sourceId === song.sourceId) {
     return {
       ...record,
       cover: cover ?? record.cover,
       lyric: lyric ?? record.lyric,
     };
   }
-  return cover || lyric ? { id: songId, cover, lyric, updatedAt: Date.now() } : undefined;
+  return cover || lyric ? { id: song.id, sourceId: song.sourceId, cover, lyric, updatedAt: Date.now() } : undefined;
 };
 
-export const deleteMediaAssets = async (songId: string) => {
-  await removeStorageFile(assetPath(songId));
-  const paths = [coverPath(songId), lyricPath(songId)].filter(Boolean);
-  await Promise.all(paths.map(async path => {
-    try {
-      if (await exists(path)) {
-        await remove(path);
-      }
-    } catch {
-      // Ignore cache cleanup failures.
-    }
-  }));
+export const deleteMediaAssets = async (song: MediaItem) => {
+  await removeStorageFile(assetPath(song));
+  const paths = [
+    coverPath(song),
+    lyricPath(song),
+  ].filter(Boolean);
+  await Promise.all(paths.map(removeIfExists));
 };

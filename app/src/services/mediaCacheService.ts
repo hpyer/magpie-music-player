@@ -26,6 +26,7 @@ export interface MediaCacheProgress {
 }
 
 const DEFAULT_LIMIT_BYTES = 1024 * 1024 * 1024;
+const SONG_CACHE_EXTENSION = 'song';
 
 const isRemoteUrl = (url: string) => /^https?:\/\//i.test(url);
 
@@ -37,51 +38,6 @@ const hashString = (value: string) => {
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
-
-const extensionFromUrl = (url: string) => {
-  try {
-    const pathname = new URL(url).pathname;
-    const match = pathname.match(/\.([a-z0-9]{2,5})$/i);
-    return match?.[1]?.toLowerCase() ?? 'audio';
-  } catch {
-    return 'audio';
-  }
-};
-
-const extensionFromContentType = (contentType: string) => {
-  const normalized = contentType.toLowerCase().split(';')[0].trim();
-  switch (normalized) {
-    case 'audio/flac':
-    case 'audio/x-flac':
-      return 'flac';
-    case 'audio/mp4':
-    case 'audio/aac':
-      return 'm4a';
-    case 'audio/ogg':
-    case 'audio/opus':
-      return 'ogg';
-    case 'audio/wav':
-    case 'audio/x-wav':
-      return 'wav';
-    case 'audio/mpeg':
-    case 'audio/mp3':
-      return 'mp3';
-    default:
-      return '';
-  }
-};
-
-const cleanExtension = (value: unknown) => (
-  typeof value === 'string' && /^[a-z0-9]{2,5}$/i.test(value)
-    ? value.toLowerCase()
-    : ''
-);
-
-const extensionFromMedia = (media: MediaItem, url: string) => (
-  cleanExtension(media.extra?.suffix)
-  || extensionFromContentType(typeof media.extra?.contentType === 'string' ? media.extra.contentType : '')
-  || extensionFromUrl(url)
-);
 
 const pathJoin = (dir: string, child: string) => {
   const separator = dir.includes('\\') ? '\\' : '/';
@@ -187,9 +143,8 @@ class MediaCacheService {
   }
 
   private cacheFilePath(media: MediaItem, url: string) {
-    const extension = extensionFromMedia(media, url);
     const id = hashString(`${media.sourceId}:${media.id}:${contentFingerprint(media, url)}`);
-    return pathJoin(this.config.cacheDir, `${id}.${extension}`);
+    return pathJoin(this.config.cacheDir, `${id}.${SONG_CACHE_EXTENSION}`);
   }
 
   private tempCacheFilePath(media: MediaItem, url: string) {
