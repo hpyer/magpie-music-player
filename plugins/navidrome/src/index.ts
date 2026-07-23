@@ -34,6 +34,7 @@ interface NavidromeSong {
   year?: number;
   duration?: number;
   coverArt?: string;
+  starred?: string;
   suffix?: string;
   contentType?: string;
   size?: number;
@@ -68,7 +69,8 @@ type NavidromeHostMessage =
   | { type: 'playlist.songs'; playlistId: string }
   | { type: 'media.url'; mediaId: string }
   | { type: 'media.lyric'; mediaId: string }
-  | { type: 'media.cover'; mediaId: string };
+  | { type: 'media.cover'; mediaId: string }
+  | { type: 'media.favorite'; mediaId: string; favorite: boolean };
 
 const PLUGIN_ID = 'cn.hpyer.magpie.navidrome';
 const DEFAULT_API_VERSION = '1.16.1';
@@ -330,6 +332,10 @@ class NavidromeClient {
     return song?.coverArt ? this.coverArtUrl(song.coverArt) : '';
   }
 
+  async setMediaFavorite(mediaId: string, favorite: boolean) {
+    await this.request(favorite ? 'star' : 'unstar', { id: mediaId });
+  }
+
   private coverArtUrl(coverArt: string) {
     return this.endpoint('getCoverArt', { id: coverArt });
   }
@@ -363,6 +369,9 @@ class NavidromeClient {
       extra: {
         navidromeId: song.id,
         playlistId,
+        remoteFavorite: Boolean(song.starred),
+        remoteFavoriteAt: song.starred,
+        remoteFavoriteProvider: 'navidrome',
         suffix: song.suffix,
         contentType: song.contentType,
         size: song.size,
@@ -378,7 +387,7 @@ function createNavidromePlugin(config: NavidromeConfig) {
   return {
     id: PLUGIN_ID,
     name: 'Navidrome',
-    version: '1.0.1',
+    version: '1.0.2',
     async listPlaylists() {
       return client.listPlaylists();
     },
@@ -393,6 +402,9 @@ function createNavidromePlugin(config: NavidromeConfig) {
     },
     async getMediaCover(mediaId: string) {
       return client.getMediaCover(mediaId);
+    },
+    async setMediaFavorite(mediaId: string, favorite: boolean) {
+      return client.setMediaFavorite(mediaId, favorite);
     },
     async ping() {
       return client.ping();
@@ -431,6 +443,9 @@ export async function handleMessage(message: NavidromeHostMessage) {
   }
   if (message.type === 'media.cover') {
     return activePlugin.getMediaCover(message.mediaId);
+  }
+  if (message.type === 'media.favorite') {
+    return activePlugin.setMediaFavorite(message.mediaId, message.favorite);
   }
 
   throw new Error(`Unsupported message type: ${(message as { type: string }).type}`);

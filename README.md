@@ -140,7 +140,7 @@ Magpie Music Player 支持插件扩展播放列表来源、歌词搜索、歌曲
 
 | 插件 | 描述 | 下载 |
 | --- | --- | --- |
-| Navidrome | 连接 Navidrome 或兼容 Subsonic API 的服务，提供远程播放列表、媒体地址解析和歌词读取能力。 | [GitHub](https://raw.githubusercontent.com/hpyer/magpie-music-player/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.1.zip) / [Gitee](https://gitee.com/Hpyer/magpie-music-player/raw/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.1.zip) |
+| Navidrome | 连接 Navidrome 或兼容 Subsonic API 的服务，提供远程播放列表、媒体地址解析、歌词读取和收藏同步能力。 | [GitHub](https://raw.githubusercontent.com/hpyer/magpie-music-player/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.2.zip) / [Gitee](https://gitee.com/Hpyer/magpie-music-player/raw/main/plugins/navidrome/release/cn.hpyer.magpie.navidrome-1.0.2.zip) |
 
 请注意：
 

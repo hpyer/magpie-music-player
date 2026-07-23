@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cn.hpyer.magpie.navidrome",
   "name": "Navidrome",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "runtime": "web-worker-esm",
   "entry": "dist/index.js",
   "author": "Hpyer",
@@ -12,6 +12,7 @@
     "media:resolve-url",
     "media:lyrics",
     "media:cover",
+    "media:favorite",
     "network:request",
     "storage:plugin"
   ],
@@ -19,13 +20,14 @@
     "playlist-source",
     "media-url",
     "media-cover",
-    "media-lyrics"
+    "media-lyrics",
+    "media-favorite"
   ],
   "networkAllowlist": [
     "user-configured:serverUrl"
   ],
   "integrity": {
     "algorithm": "sha256",
-    "entry": "527932216a9f7f9f82e6f9287c3681e546cc8b55db97c32ab811a72efb021cf8"
+    "entry": "9ffa7b2725b3eca0ebab67e879d6b9ac00f8f9b802621719f1bd47b73b296cd1"
   }
 }

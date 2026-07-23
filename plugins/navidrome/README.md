@@ -10,6 +10,8 @@
 - `getCoverArt`
 - `getLyricsBySongId`
 - `getLyrics`
+- `star`
+- `unstar`
 
 ## 构建
 
@@ -52,5 +54,6 @@ release/cn.hpyer.magpie.navidrome-x.x.x.zip
 - 媒体播放地址解析。
 - 封面地址读取。
 - 歌词读取。
+- 远程收藏/取消收藏同步。
 
 该插件面向用户自有或已授权的 Navidrome 服务，不提供公共音乐搜索能力。
