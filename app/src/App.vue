@@ -114,6 +114,7 @@ const musicSearchPlugins = ref<Array<{ id: string; name: string }>>([]);
 const settingsTab = ref<SettingsTab>('theme');
 const settingsDraft = ref<AppSettings>(createDefaultAppSettings());
 const pendingPluginRemovals = ref(new Set<string>());
+const pendingPluginPlaylistRefreshIds = ref(new Set<string>());
 const isPluginPackageDragActive = ref(false);
 const isInstallingPluginPackage = ref(false);
 const expandedPluginIds = ref(new Set<string>());
@@ -1603,9 +1604,45 @@ const deleteEditingPlaylist = async () => {
   closePlaylistModal();
 };
 
+const refreshPluginPlaylistsForPlugins = async (pluginIds: Set<string>) => {
+  if (!pluginIds.size) return;
+
+  const playlists = playlistStore.playlists.filter(playlist => (
+    playlist.type === 'plugin-playlist'
+    && playlist.pluginPlaylist?.pluginId
+    && pluginIds.has(playlist.pluginPlaylist.pluginId)
+    && pluginManager.getPlugin(playlist.pluginPlaylist.pluginId)
+  ));
+  if (!playlists.length) return;
+
+  isScanning.value = true;
+  const failures: string[] = [];
+  try {
+    for (const playlist of playlists) {
+      scanningPlaylistId.value = playlist.id;
+      try {
+        await playlistStore.refreshPluginPlaylist(playlist.id);
+        await loadVisiblePlaylistCovers(playlist);
+      } catch (error) {
+        failures.push(`${playlist.name}: ${String(error)}`);
+      }
+    }
+  } finally {
+    isScanning.value = false;
+    scanningPlaylistId.value = null;
+  }
+
+  if (failures.length) {
+    showToast(`刷新远程歌曲失败:\n${failures.join('\n')}`, { title: '远程播放列表', kind: 'error' });
+  } else {
+    showToast(`已刷新 ${playlists.length} 个远程播放列表的歌曲。`, { title: '远程播放列表', kind: 'success' });
+  }
+};
+
 const openSettingsModal = () => {
   settingsDraft.value = cloneSettings(normalizeShortcutsForPlatform(settingsStore.settings, isMacOs.value));
   pendingPluginRemovals.value = new Set();
+  pendingPluginPlaylistRefreshIds.value = new Set();
   settingsTab.value = 'theme';
   isSettingsModalOpen.value = true;
   void refreshCacheUsage();
@@ -1614,6 +1651,7 @@ const openSettingsModal = () => {
 const closeSettingsModal = () => {
   settingsDraft.value = cloneSettings(normalizeShortcutsForPlatform(settingsStore.settings, isMacOs.value));
   pendingPluginRemovals.value = new Set();
+  pendingPluginPlaylistRefreshIds.value = new Set();
   activeShortcutId.value = null;
   pressedShortcutKeys.value.clear();
   isSettingsModalOpen.value = false;
@@ -1632,6 +1670,7 @@ const saveSettings = async () => {
   }
 
   settingsDraft.value.cache.allowedSourceIds = thirdPartyCacheAllowedSourceIds(settingsDraft.value);
+  const pluginPlaylistRefreshIds = new Set(pendingPluginPlaylistRefreshIds.value);
   await settingsStore.save(normalizeShortcutsForPlatform(settingsDraft.value, isMacOs.value));
   await ensureConfiguredCacheDirectories();
   syncMediaCacheConfig();
@@ -1643,6 +1682,8 @@ const saveSettings = async () => {
   }
   pendingPluginRemovals.value = new Set();
   await syncExternalPlugins(true);
+  await refreshPluginPlaylistsForPlugins(pluginPlaylistRefreshIds);
+  pendingPluginPlaylistRefreshIds.value = new Set();
   await syncAppGlobalShortcuts(true);
   isSettingsModalOpen.value = false;
 };
@@ -2149,6 +2190,10 @@ const installPluginPackages = async (paths: string[]) => {
         const existing = currentIndex >= 0 ? settingsDraft.value.plugins[currentIndex] : undefined;
         const blocked = pluginBlocklistService.matchPlugin(installed, settingsStore.settings.pluginBlocklist.cached)?.block;
         const warning = pluginBlocklistService.matchPluginWarning(installed, settingsStore.settings.pluginBlocklist.cached)?.warning;
+        const packageChanged = Boolean(existing && (
+          existing.version !== installed.version
+          || existing.installedIntegrity?.packageHash !== installed.installedIntegrity?.packageHash
+        ));
         const nextPlugin = {
           ...installed,
           enabled: blocked ? false : (existing?.enabled ?? installed.enabled),
@@ -2162,6 +2207,9 @@ const installPluginPackages = async (paths: string[]) => {
           settingsDraft.value.plugins.push(nextPlugin);
         }
         pendingPluginRemovals.value.delete(installed.id);
+        if (packageChanged) {
+          pendingPluginPlaylistRefreshIds.value.add(installed.id);
+        }
         installedNames.push(`${installed.name} ${installed.version}`);
       } catch (error) {
         errors.push(`${packagePath}: ${String(error)}`);
@@ -2664,7 +2712,7 @@ const submitPlaylistForm = async () => {
 
       if (type === 'local-directory' && shouldScanImmediately) {
         await scanLocalMusic(localDir, playlist.id);
-      } else if (type === 'plugin-playlist') {
+      } else if (type === 'plugin-playlist' && shouldScanImmediately) {
         isScanning.value = true;
         try {
           await playlistStore.refreshPluginPlaylist(playlist.id);
@@ -2682,7 +2730,8 @@ const submitPlaylistForm = async () => {
     const shouldReloadLocalSongs = shouldScanImmediately && type === 'local-directory';
     const shouldRefreshPluginSongs = type === 'plugin-playlist'
       && (
-        playlist?.pluginPlaylist?.pluginId !== pluginId
+        shouldScanImmediately
+        || playlist?.pluginPlaylist?.pluginId !== pluginId
         || playlist?.pluginPlaylist?.playlistId !== pluginPlaylistId
         || !playlist?.songs.length
       );

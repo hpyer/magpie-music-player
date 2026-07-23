@@ -67,19 +67,6 @@ defineEmits<{
         </div>
       </div>
 
-      <div v-if="isLocalDirectoryPlaylist" class="form-switch">
-        <button
-          type="button"
-          class="switch-button"
-          :aria-pressed="playlistForm.scanImmediately"
-          aria-label="立即扫描文件"
-          @click="playlistForm.scanImmediately = !playlistForm.scanImmediately"
-        >
-          <span class="switch-track" aria-hidden="true"></span>
-        </button>
-        <span>立即扫描文件</span>
-      </div>
-
       <template v-if="isPluginPlaylist">
         <div class="form-field">
           <span>远程播放列表</span>
@@ -97,6 +84,19 @@ defineEmits<{
           </div>
         </div>
       </template>
+
+      <div v-if="isLocalDirectoryPlaylist || isPluginPlaylist" class="form-switch">
+        <button
+          type="button"
+          class="switch-button"
+          :aria-pressed="playlistForm.scanImmediately"
+          :aria-label="isPluginPlaylist ? '立即刷新歌曲' : '立即扫描文件'"
+          @click="playlistForm.scanImmediately = !playlistForm.scanImmediately"
+        >
+          <span class="switch-track" aria-hidden="true"></span>
+        </button>
+        <span>{{ isPluginPlaylist ? '立即刷新歌曲' : '立即扫描文件' }}</span>
+      </div>
 
       <footer class="modal-actions playlist-modal-actions" :class="{ 'with-delete': playlistFormMode === 'edit' }">
         <button
