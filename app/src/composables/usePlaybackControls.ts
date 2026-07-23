@@ -4,9 +4,14 @@ import type { RepeatMode } from '../types/ui';
 import { usePlayerStore } from '../store/playerStore';
 import { usePlaylistStore } from '../store/playlistStore';
 
+interface PlaybackControlOptions {
+  onFavoriteToggleError?: (error: unknown, song: MediaItem) => void;
+}
+
 export const usePlaybackControls = (
   songs: ComputedRef<MediaItem[]>,
   currentSongIndex: ComputedRef<number>,
+  options: PlaybackControlOptions = {},
 ) => {
   const playlistStore = usePlaylistStore();
   const playerStore = usePlayerStore();
@@ -54,7 +59,9 @@ export const usePlaybackControls = (
   };
 
   const toggleSongFavorite = (song: MediaItem) => {
-    void playlistStore.toggleFavoriteSong(song);
+    void playlistStore.toggleFavoriteSong(song).catch(error => {
+      options.onFavoriteToggleError?.(error, song);
+    });
   };
 
   const toggleCurrentFavorite = () => {

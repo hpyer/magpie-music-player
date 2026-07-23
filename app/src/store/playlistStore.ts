@@ -139,6 +139,8 @@ const hasSongReference = (playlists: Playlist[], key: string) => (
   playlists.some(playlist => playlist.songs.some(song => favoriteSongKey(song) === key))
 );
 
+const isRemoteFavorite = (song: MediaItem) => song.extra?.remoteFavorite === true;
+
 export const usePlaylistStore = defineStore('playlist', {
   state: () => ({
     playlists: [] as Playlist[],
@@ -374,6 +376,7 @@ export const usePlaylistStore = defineStore('playlist', {
         playlist.pluginPlaylist.playlistId,
       );
 
+      this.syncFavoriteSongsFromRemote(songs);
       playlist.songs = songs;
       await runInBatches(songs, saveMediaAssets);
       await this.save({ throwOnError: true });
@@ -387,6 +390,19 @@ export const usePlaylistStore = defineStore('playlist', {
       return Boolean(this.favoriteSongs[favoriteSongKey(song)]);
     },
 
+    syncFavoriteSongsFromRemote(songs: MediaItem[]) {
+      songs.forEach(song => {
+        if (!pluginManager.canSetMediaFavorite(song.sourceId)) return;
+
+        const key = favoriteSongKey(song);
+        if (isRemoteFavorite(song)) {
+          this.favoriteSongs[key] = favoriteSongSnapshot(song, this.favoriteSongs[key]);
+        } else {
+          delete this.favoriteSongs[key];
+        }
+      });
+    },
+
     async setFavoriteSong(song: MediaItem, favorite: boolean) {
       const key = favoriteSongKey(song);
       if (favorite) {
@@ -398,7 +414,11 @@ export const usePlaylistStore = defineStore('playlist', {
     },
 
     async toggleFavoriteSong(song: MediaItem) {
-      await this.setFavoriteSong(song, !this.isFavoriteSong(song));
+      const favorite = !this.isFavoriteSong(song);
+      if (pluginManager.canSetMediaFavorite(song.sourceId)) {
+        await pluginManager.setMediaFavorite(song.sourceId, song.id, favorite);
+      }
+      await this.setFavoriteSong(song, favorite);
     },
 
     async updateSongLyric(songId: string, lyric: string, options: { cache?: boolean } = {}) {

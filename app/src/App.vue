@@ -212,7 +212,11 @@ const {
   toggleSongFavorite,
   toggleVolumePopover,
   volumePercent,
-} = usePlaybackControls(songs, currentSongIndex);
+} = usePlaybackControls(songs, currentSongIndex, {
+  onFavoriteToggleError: error => {
+    showToast(`同步收藏失败: ${String(error)}`, { title: '收藏', kind: 'error' });
+  },
+});
 const currentSong = computed(() => playerStore.currentMedia ?? songs.value[0] ?? null);
 const displayedCurrentTime = computed(() => (
   playerStore.currentMedia?.id === currentSong.value?.id
