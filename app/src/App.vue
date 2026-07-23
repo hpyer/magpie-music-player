@@ -32,7 +32,15 @@ import { pluginInstallerService } from './services/pluginInstallerService';
 import { pluginRuntimeService } from './services/pluginRuntimeService';
 import { AppStorageCorruptionError, resetAppStorage } from './store/appFileStorage';
 import { readPlaybackSession, writePlaybackSession, type PlaybackSession } from './store/playbackSessionStore';
-import { AppSettings, InstalledPluginSetting, ShortcutSetting, createDefaultAppSettings, useAppSettingsStore } from './store/appSettingsStore';
+import {
+  AppSettings,
+  InstalledPluginSetting,
+  type PlaybackFadeMode,
+  type PlaybackStartupRestoreMode,
+  ShortcutSetting,
+  createDefaultAppSettings,
+  useAppSettingsStore,
+} from './store/appSettingsStore';
 import { configureMediaAssetCache, loadMediaAssets } from './store/mediaAssetCache';
 import { usePlayerStore } from './store/playerStore';
 import { FAVORITES_PLAYLIST_ID, usePlaylistStore } from './store/playlistStore';
@@ -561,6 +569,7 @@ const requestStorageReinitialization = async () => {
 const initializeAppSettings = async () => {
   try {
     await settingsStore.initialize();
+    syncPlayerPlaybackSettings();
     return true;
   } catch (error) {
     if (!(error instanceof AppStorageCorruptionError)) {
@@ -571,8 +580,20 @@ const initializeAppSettings = async () => {
     if (!didReset) return false;
 
     await settingsStore.initialize();
+    syncPlayerPlaybackSettings();
     return true;
   }
+};
+
+const playbackFadeDurations = (mode: PlaybackFadeMode) => {
+  if (mode === 'off') return { fadeIn: 0, fadeOut: 0 };
+  if (mode === 'short') return { fadeIn: 120, fadeOut: 420 };
+  return { fadeIn: 180, fadeOut: 800 };
+};
+
+const syncPlayerPlaybackSettings = () => {
+  const durations = playbackFadeDurations(settingsStore.settings.playback.fadeMode);
+  player.setPlaybackFadeDurations(durations.fadeIn, durations.fadeOut);
 };
 
 const resizeWindow = async () => {
@@ -1033,10 +1054,21 @@ const closeAfterPersist = async () => {
 };
 
 const restorePlaybackSession = async (session: PlaybackSession) => {
+  const startupRestoreMode = settingsStore.settings.playback.startupRestoreMode;
+  if (startupRestoreMode === 'none') {
+    setPlaybackRestoreState({
+      repeatMode: 'none',
+      shuffleEnabled: false,
+      wasPlaying: false,
+    });
+    return true;
+  }
+
+  const shouldResume = startupRestoreMode === 'play' && session.wasPlaying;
   setPlaybackRestoreState({
     repeatMode: session.repeatMode,
     shuffleEnabled: session.shuffleEnabled,
-    wasPlaying: session.wasPlaying,
+    wasPlaying: shouldResume,
   });
 
   if (session.currentPlaylistId && selectablePlaylists.value.some(playlist => playlist.id === session.currentPlaylistId)) {
@@ -1079,7 +1111,17 @@ const restorePlaybackSession = async (session: PlaybackSession) => {
     rebuildShuffleQueue(playlistStore.favoriteKey(song));
   }
 
-  playbackShouldResume.value = false;
+  if (shouldResume) {
+    playbackShouldResume.value = true;
+    try {
+      await playerStore.play(song);
+    } catch (error) {
+      console.warn('[App] Failed to resume restored playback session:', error);
+      playbackShouldResume.value = false;
+    }
+  } else {
+    playbackShouldResume.value = false;
+  }
   playerStore.syncStatus();
   return true;
 };
@@ -1672,6 +1714,7 @@ const saveSettings = async () => {
   settingsDraft.value.cache.allowedSourceIds = thirdPartyCacheAllowedSourceIds(settingsDraft.value);
   const pluginPlaylistRefreshIds = new Set(pendingPluginPlaylistRefreshIds.value);
   await settingsStore.save(normalizeShortcutsForPlatform(settingsDraft.value, isMacOs.value));
+  syncPlayerPlaybackSettings();
   await ensureConfiguredCacheDirectories();
   syncMediaCacheConfig();
   await enforceCacheLimits();
@@ -2491,6 +2534,14 @@ const updateFavoriteShuffleWeight = (value: number) => {
   settingsDraft.value.playback.favoriteShuffleWeight = Number.isFinite(value) ? value : 1;
 };
 
+const updatePlaybackStartupRestoreMode = (value: PlaybackStartupRestoreMode) => {
+  settingsDraft.value.playback.startupRestoreMode = value;
+};
+
+const updatePlaybackFadeMode = (value: PlaybackFadeMode) => {
+  settingsDraft.value.playback.fadeMode = value;
+};
+
 const updateCacheSourceAllowed = (sourceId: string, allowed: boolean) => {
   const plugin = settingsDraft.value.plugins.find(item => item.id === sourceId);
   if (!plugin || !isCacheSourceConfigurable(plugin)) return;
@@ -2979,6 +3030,8 @@ const submitPlaylistForm = async () => {
       @update-cache-group-limit="updateCacheGroupLimit"
       @update-cache-source-allowed="updateCacheSourceAllowed"
       @update-favorite-shuffle-weight="updateFavoriteShuffleWeight"
+      @update-playback-fade-mode="updatePlaybackFadeMode"
+      @update-playback-startup-restore-mode="updatePlaybackStartupRestoreMode"
       @update-plugin-config-boolean="updatePluginConfigFromBoolean"
       @update-plugin-config-input="updatePluginConfigFromInput"
       @update-plugin-enabled="updatePluginEnabled"

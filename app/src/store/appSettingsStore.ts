@@ -91,8 +91,13 @@ export interface CacheSettings {
   allowedSourceIds: string[];
 }
 
+export type PlaybackStartupRestoreMode = 'none' | 'load' | 'play';
+export type PlaybackFadeMode = 'off' | 'short' | 'standard';
+
 export interface PlaybackSettings {
   favoriteShuffleWeight: number;
+  startupRestoreMode: PlaybackStartupRestoreMode;
+  fadeMode: PlaybackFadeMode;
 }
 
 export interface AppSettings {
@@ -124,6 +129,8 @@ export const createDefaultAppSettings = (): AppSettings => ({
   shortcuts: defaultShortcuts(),
   playback: {
     favoriteShuffleWeight: 1,
+    startupRestoreMode: 'load',
+    fadeMode: 'standard',
   },
   cache: {
     songs: { dir: '', limitGb: 1 },
@@ -166,6 +173,16 @@ const normalizeFavoriteShuffleWeight = (value: unknown, fallback: number) => {
   if (!Number.isFinite(numericValue)) return fallback;
   if (![1, 1.5, 2, 3].includes(numericValue)) return fallback;
   return numericValue;
+};
+
+const normalizeStartupRestoreMode = (value: unknown, fallback: PlaybackStartupRestoreMode): PlaybackStartupRestoreMode => {
+  if (value === 'none' || value === 'load' || value === 'play') return value;
+  return fallback;
+};
+
+const normalizePlaybackFadeMode = (value: unknown, fallback: PlaybackFadeMode): PlaybackFadeMode => {
+  if (value === 'off' || value === 'short' || value === 'standard') return value;
+  return fallback;
 };
 
 const normalizeConfigSchema = (schema: unknown): PluginConfigField[] | undefined => {
@@ -246,6 +263,14 @@ const normalizeSettings = (settings: Partial<AppSettings>): AppSettings => {
       favoriteShuffleWeight: normalizeFavoriteShuffleWeight(
         settings.playback?.favoriteShuffleWeight,
         fallback.playback.favoriteShuffleWeight,
+      ),
+      startupRestoreMode: normalizeStartupRestoreMode(
+        settings.playback?.startupRestoreMode,
+        fallback.playback.startupRestoreMode,
+      ),
+      fadeMode: normalizePlaybackFadeMode(
+        settings.playback?.fadeMode,
+        fallback.playback.fadeMode,
       ),
     },
     cache: {

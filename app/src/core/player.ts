@@ -46,6 +46,8 @@ export class Player {
   private volumeFadeFrame: number | null = null;
   private volumeFadeToken = 0;
   private playbackOperationToken = 0;
+  private playbackFadeInDurationMs = 220;
+  private playbackFadeOutDurationMs = 720;
   private volumeWatchdogTimer: number | null = null;
   private localBlobUrl: string | null = null;
   private backend: 'web' | 'native' = 'web';
@@ -111,6 +113,23 @@ export class Player {
     return token === this.playbackOperationToken;
   }
 
+  private fadeInDuration(fallback = this.playbackFadeInDurationMs) {
+    return this.playbackFadeInDurationMs > 0 ? Math.min(this.playbackFadeInDurationMs, fallback) : 0;
+  }
+
+  private fadeOutDuration(fallback = this.playbackFadeOutDurationMs) {
+    return this.playbackFadeOutDurationMs > 0 ? Math.min(this.playbackFadeOutDurationMs, fallback) : 0;
+  }
+
+  private isCurrentMedia(media: MediaItem) {
+    return this.currentMedia?.id === media.id && this.currentMedia.sourceId === media.sourceId;
+  }
+
+  private async fadeOutBeforeSourceChange(playbackOperationToken: number) {
+    if (this.backend !== 'web' || this.audio.paused || !this.audio.src) return;
+    await this.fadeVolume(0, this.fadeOutDuration(), playbackOperationToken);
+  }
+
   private fadeVolume(toVolume: number, duration = 220, playbackOperationToken = this.playbackOperationToken) {
     this.cancelVolumeFade();
 
@@ -135,7 +154,10 @@ export class Player {
         }
 
         const progress = Math.min(1, (timestamp - startedAt) / duration);
-        const easedProgress = 1 - Math.pow(1 - progress, 3);
+        const isFadingOut = targetVolume < fromVolume;
+        const easedProgress = isFadingOut
+          ? progress * progress
+          : 1 - Math.pow(1 - progress, 3);
         this.audio.volume = fromVolume + (targetVolume - fromVolume) * easedProgress;
 
         if (progress < 1) {
@@ -339,7 +361,8 @@ export class Player {
   }
 
   private async fadeInPlayback(playTask: Promise<void>, playbackOperationToken: number) {
-    this.audio.volume = 0;
+    const duration = this.fadeInDuration();
+    this.audio.volume = duration > 0 ? 0 : this.targetVolume;
     try {
       await playTask;
     } catch (error) {
@@ -353,7 +376,7 @@ export class Player {
 
     if (!this.isCurrentPlaybackOperation(playbackOperationToken)) return;
     this.ensureAudiblePlayback(playbackOperationToken);
-    await this.fadeVolume(this.targetVolume, 220, playbackOperationToken);
+    await this.fadeVolume(this.targetVolume, duration, playbackOperationToken);
   }
 
   private async resolveMediaUrl(media: MediaItem) {
@@ -435,8 +458,9 @@ export class Player {
 
   public async play(media: MediaItem) {
     const playbackOperationToken = this.beginPlaybackOperation();
+    const isSameMedia = this.isCurrentMedia(media);
 
-    if (this.backend === 'native' && this.currentMedia?.id === media.id) {
+    if (this.backend === 'native' && isSameMedia) {
       await invoke('native_audio_resume');
       if (!this.isCurrentPlaybackOperation(playbackOperationToken)) return;
       this.isPlaying = true;
@@ -451,29 +475,34 @@ export class Player {
       return;
     }
 
-    await this.stopNativeAudio();
-
-    if (this.currentMedia?.id === media.id && this.audio.src) {
+    if (isSameMedia && this.audio.src) {
       if (!this.audio.paused) {
         await this.audio.play();
         if (!this.isCurrentPlaybackOperation(playbackOperationToken)) return;
         this.ensureAudiblePlayback(playbackOperationToken);
-        return this.fadeVolume(this.targetVolume, 120, playbackOperationToken);
+        return this.fadeVolume(this.targetVolume, this.fadeInDuration(120), playbackOperationToken);
       }
       return this.playCurrentSource(media, playbackOperationToken);
     }
 
-    this.currentMedia = media;
+    await this.fadeOutBeforeSourceChange(playbackOperationToken);
+    if (!this.isCurrentPlaybackOperation(playbackOperationToken)) return;
+
     const url = await this.resolveMediaUrl(media);
     if (!this.isCurrentPlaybackOperation(playbackOperationToken)) return;
 
     if (url) {
+      await this.stopNativeAudio();
+      if (!this.isCurrentPlaybackOperation(playbackOperationToken)) return;
+
+      this.currentMedia = media;
       console.log(`[Player] Setting audio src to: ${url}`);
       this.revokeLocalBlobUrl(url);
       this.audio.src = url;
       this.audio.load();
       return this.playCurrentSource(media, playbackOperationToken);
     } else {
+      this.audio.volume = this.targetVolume;
       console.error(`Cannot find URL for media: ${media.title}`);
     }
   }
@@ -497,7 +526,7 @@ export class Player {
       return;
     }
 
-    await this.fadeVolume(0, 180, playbackOperationToken);
+    await this.fadeVolume(0, this.fadeInDuration(180), playbackOperationToken);
     if (!this.isCurrentPlaybackOperation(playbackOperationToken)) return;
     this.audio.pause();
     this.audio.volume = this.targetVolume;
@@ -545,6 +574,15 @@ export class Player {
     if (this.backend === 'native') {
       void invoke('native_audio_set_volume', { volume: this.targetVolume });
     }
+  }
+
+  public setPlaybackFadeDurations(fadeInDurationMs: number, fadeOutDurationMs: number) {
+    this.playbackFadeInDurationMs = Number.isFinite(fadeInDurationMs)
+      ? Math.min(1000, Math.max(0, fadeInDurationMs))
+      : 220;
+    this.playbackFadeOutDurationMs = Number.isFinite(fadeOutDurationMs)
+      ? Math.min(1500, Math.max(0, fadeOutDurationMs))
+      : 720;
   }
 
   public onEnded(listener: () => void) {

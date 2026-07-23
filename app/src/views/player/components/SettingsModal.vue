@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import AppModal from '../../../components/AppModal.vue';
-import type { AppSettings, InstalledPluginSetting, ShortcutSetting, ThemeId } from '../../../store/appSettingsStore';
+import type {
+  AppSettings,
+  InstalledPluginSetting,
+  PlaybackFadeMode,
+  PlaybackStartupRestoreMode,
+  ShortcutSetting,
+  ThemeId,
+} from '../../../store/appSettingsStore';
 import type { PluginConfigField } from '../../../types/plugin';
 import type { CacheGroup, SettingsTab, ThemeOption } from '../../../types/ui';
 
@@ -9,6 +16,18 @@ const favoriteShuffleWeightOptions = [
   { value: 1.5, label: '1.5x' },
   { value: 2, label: '2x' },
   { value: 3, label: '3x' },
+];
+
+const startupRestoreModeOptions: Array<{ value: PlaybackStartupRestoreMode; label: string }> = [
+  { value: 'none', label: '不恢复' },
+  { value: 'load', label: '恢复歌曲' },
+  { value: 'play', label: '继续播放' },
+];
+
+const playbackFadeModeOptions: Array<{ value: PlaybackFadeMode; label: string }> = [
+  { value: 'off', label: '无' },
+  { value: 'short', label: '短' },
+  { value: 'standard', label: '标准' },
 ];
 
 defineProps<{
@@ -54,6 +73,8 @@ defineEmits<{
   (event: 'toggle-plugin-expanded', value: string): void;
   (event: 'update-cache-group-limit', groupId: CacheGroup['id'], value: Event): void;
   (event: 'update-cache-source-allowed', sourceId: string, value: boolean): void;
+  (event: 'update-playback-fade-mode', value: PlaybackFadeMode): void;
+  (event: 'update-playback-startup-restore-mode', value: PlaybackStartupRestoreMode): void;
   (event: 'update-favorite-shuffle-weight', value: number): void;
   (event: 'update-plugin-config-boolean', plugin: InstalledPluginSetting, field: PluginConfigField, value: boolean): void;
   (event: 'update-plugin-config-input', plugin: InstalledPluginSetting, field: PluginConfigField, value: Event): void;
@@ -104,13 +125,49 @@ defineEmits<{
 
           <section v-else-if="settingsTab === 'playback'" class="settings-section">
             <div class="settings-field">
+              <span>启动恢复</span>
+              <div class="type-options playback-segment-options" role="radiogroup" aria-label="启动恢复">
+                <button
+                  v-for="option in startupRestoreModeOptions"
+                  :key="option.value"
+                  type="button"
+                  class="type-option playback-segment-option"
+                  :class="{ active: settingsDraft.playback.startupRestoreMode === option.value }"
+                  role="radio"
+                  :aria-checked="settingsDraft.playback.startupRestoreMode === option.value"
+                  @click="$emit('update-playback-startup-restore-mode', option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-field">
+              <span>切歌淡入淡出</span>
+              <div class="type-options playback-segment-options playback-fade-options" role="radiogroup" aria-label="切歌淡入淡出">
+                <button
+                  v-for="option in playbackFadeModeOptions"
+                  :key="option.value"
+                  type="button"
+                  class="type-option playback-segment-option"
+                  :class="{ active: settingsDraft.playback.fadeMode === option.value }"
+                  role="radio"
+                  :aria-checked="settingsDraft.playback.fadeMode === option.value"
+                  @click="$emit('update-playback-fade-mode', option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-field">
               <span>收藏歌曲随机权重</span>
-              <div class="type-options favorite-weight-options" role="radiogroup" aria-label="收藏歌曲随机权重">
+              <div class="type-options playback-segment-options favorite-weight-options" role="radiogroup" aria-label="收藏歌曲随机权重">
                 <button
                   v-for="option in favoriteShuffleWeightOptions"
                   :key="option.value"
                   type="button"
-                  class="type-option favorite-weight-option"
+                  class="type-option playback-segment-option favorite-weight-option"
                   :class="{ active: settingsDraft.playback.favoriteShuffleWeight === option.value }"
                   role="radio"
                   :aria-checked="settingsDraft.playback.favoriteShuffleWeight === option.value"
