@@ -4,6 +4,13 @@ import type { AppSettings, InstalledPluginSetting, ShortcutSetting, ThemeId } fr
 import type { PluginConfigField } from '../../../types/plugin';
 import type { CacheGroup, SettingsTab, ThemeOption } from '../../../types/ui';
 
+const favoriteShuffleWeightOptions = [
+  { value: 1, label: '无' },
+  { value: 1.5, label: '1.5x' },
+  { value: 2, label: '2x' },
+  { value: 3, label: '3x' },
+];
+
 defineProps<{
   activeShortcutId: string | null;
   appDescription: string;
@@ -47,7 +54,7 @@ defineEmits<{
   (event: 'toggle-plugin-expanded', value: string): void;
   (event: 'update-cache-group-limit', groupId: CacheGroup['id'], value: Event): void;
   (event: 'update-cache-source-allowed', sourceId: string, value: boolean): void;
-  (event: 'update-favorite-shuffle-weight', value: Event): void;
+  (event: 'update-favorite-shuffle-weight', value: number): void;
   (event: 'update-plugin-config-boolean', plugin: InstalledPluginSetting, field: PluginConfigField, value: boolean): void;
   (event: 'update-plugin-config-input', plugin: InstalledPluginSetting, field: PluginConfigField, value: Event): void;
   (event: 'update-plugin-enabled', plugin: InstalledPluginSetting, value: boolean): void;
@@ -98,16 +105,20 @@ defineEmits<{
           <section v-else-if="settingsTab === 'playback'" class="settings-section">
             <div class="settings-field">
               <span>收藏歌曲随机权重</span>
-              <select
-                :value="String(settingsDraft.playback.favoriteShuffleWeight)"
-                aria-label="收藏歌曲随机权重"
-                @change="$emit('update-favorite-shuffle-weight', $event)"
-              >
-                <option value="1">关闭</option>
-                <option value="1.5">1.5x</option>
-                <option value="2">2x</option>
-                <option value="3">3x</option>
-              </select>
+              <div class="type-options favorite-weight-options" role="radiogroup" aria-label="收藏歌曲随机权重">
+                <button
+                  v-for="option in favoriteShuffleWeightOptions"
+                  :key="option.value"
+                  type="button"
+                  class="type-option favorite-weight-option"
+                  :class="{ active: settingsDraft.playback.favoriteShuffleWeight === option.value }"
+                  role="radio"
+                  :aria-checked="settingsDraft.playback.favoriteShuffleWeight === option.value"
+                  @click="$emit('update-favorite-shuffle-weight', option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
             </div>
           </section>
 

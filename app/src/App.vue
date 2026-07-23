@@ -2487,10 +2487,8 @@ const updateCacheGroupLimit = (groupId: CacheGroupId, event: Event) => {
   settingsDraft.value.cache[groupId].limitGb = normalizedValue;
 };
 
-const updateFavoriteShuffleWeight = (event: Event) => {
-  const target = event.target as HTMLSelectElement | null;
-  const nextValue = Number(target?.value);
-  settingsDraft.value.playback.favoriteShuffleWeight = Number.isFinite(nextValue) ? nextValue : 1;
+const updateFavoriteShuffleWeight = (value: number) => {
+  settingsDraft.value.playback.favoriteShuffleWeight = Number.isFinite(value) ? value : 1;
 };
 
 const updateCacheSourceAllowed = (sourceId: string, allowed: boolean) => {
