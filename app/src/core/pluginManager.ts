@@ -283,6 +283,24 @@ export class PluginManager {
     return Boolean(this.plugins.get(pluginId)?.deleteMedia);
   }
 
+  public canSetMediaFavorite(pluginId: string): boolean {
+    return Boolean(this.plugins.get(pluginId)?.setMediaFavorite);
+  }
+
+  public async setMediaFavorite(pluginId: string, mediaId: string, favorite: boolean) {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin?.setMediaFavorite) {
+      throw new Error('该插件不支持同步远程收藏。');
+    }
+
+    try {
+      await plugin.setMediaFavorite(mediaId, favorite);
+    } catch (error) {
+      logPluginFailure(plugin, 'media.favorite', error);
+      throw error;
+    }
+  }
+
   public async deleteMedia(pluginId: string, mediaId: string, context?: MediaDeleteContext) {
     const plugin = this.plugins.get(pluginId);
     if (!plugin?.deleteMedia) {

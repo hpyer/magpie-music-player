@@ -216,6 +216,8 @@ export type PluginPermission =
   | 'media:cover'
   /** 读取或写入歌曲元数据。 */
   | 'media:metadata'
+  /** 写入远程媒体收藏状态。 */
+  | 'media:favorite'
   /** 删除远程媒体。 */
   | 'media:delete'
   /** 写入媒体缓存。 */
@@ -239,6 +241,8 @@ export type PluginCapability =
   | 'media-lyrics'
   /** 按媒体 id 读取封面能力。 */
   | 'media-cover'
+  /** 写入远程媒体收藏状态能力。 */
+  | 'media-favorite'
   /** 远程媒体删除能力。 */
   | 'media-delete'
   /** 远程播放列表来源能力。 */
@@ -400,6 +404,15 @@ export type MediaCoverMessage = {
   mediaId: string;
 };
 
+/** 媒体收藏状态写入消息。 */
+export type MediaFavoriteMessage = {
+  type: 'media.favorite';
+  /** 插件内部的媒体 id。 */
+  mediaId: string;
+  /** 是否收藏。 */
+  favorite: boolean;
+};
+
 /** 删除远程媒体消息。 */
 export type MediaDeleteMessage = {
   type: 'media.delete';
@@ -420,6 +433,7 @@ export type PluginMessage =
   | MediaUrlMessage
   | MediaLyricMessage
   | MediaCoverMessage
+  | MediaFavoriteMessage
   | MediaDeleteMessage;
 
 /** 主应用内部注册插件时保存的记录。 */
@@ -490,6 +504,8 @@ export interface Plugin {
   getMediaLyric?(mediaId: string): Promise<string>;
   /** 获取媒体封面地址或数据 URL。 */
   getMediaCover?(mediaId: string): Promise<string>;
+  /** 写入远程媒体收藏状态。 */
+  setMediaFavorite?(mediaId: string, favorite: boolean): Promise<void>;
 
   /** 搜索歌词。 */
   searchLyrics?(context: LyricSearchContext): Promise<LyricSearchResult[]>;

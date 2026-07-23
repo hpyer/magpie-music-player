@@ -483,6 +483,12 @@ class PluginRuntimeService {
       );
     }
 
+    if (runtimePlugin.manifest.capabilities.includes('media-favorite')) {
+      adapter.setMediaFavorite = (mediaId: string, favorite: boolean) => (
+        host.sendMessage<void>({ type: 'media.favorite', mediaId, favorite })
+      );
+    }
+
     if (runtimePlugin.manifest.capabilities.includes('media-delete')) {
       adapter.deleteMedia = (mediaId: string, context?: MediaDeleteContext) => (
         host.sendMessage<void>({ type: 'media.delete', mediaId, context })
