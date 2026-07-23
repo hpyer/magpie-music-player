@@ -48,6 +48,7 @@ export const cloneSettings = (settings: AppSettings): AppSettings => ({
     lyrics: { ...settings.cache.lyrics },
     allowedSourceIds: [...settings.cache.allowedSourceIds],
   },
+  playback: { ...settings.playback },
   pluginBlocklist: {
     ...settings.pluginBlocklist,
     urls: settings.pluginBlocklist.urls ? [...settings.pluginBlocklist.urls] : undefined,

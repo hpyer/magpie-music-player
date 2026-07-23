@@ -4,7 +4,7 @@ import type { ThemeId } from '../store/appSettingsStore';
 export type PanelMode = 'playlist' | 'lyrics' | 'search' | null;
 export type RepeatMode = PlaybackRepeatMode;
 export type PlaylistFormMode = 'create' | 'edit';
-export type SettingsTab = 'theme' | 'plugins' | 'shortcuts' | 'cache' | 'about';
+export type SettingsTab = 'theme' | 'playback' | 'plugins' | 'shortcuts' | 'cache' | 'about';
 export type CacheGroupId = 'songs' | 'covers' | 'lyrics';
 export type PlaylistFormType = 'local-directory' | 'plugin-playlist' | `plugin:${string}`;
 

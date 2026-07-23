@@ -5,6 +5,7 @@ import { usePlayerStore } from '../store/playerStore';
 import { usePlaylistStore } from '../store/playlistStore';
 
 interface PlaybackControlOptions {
+  favoriteShuffleWeight?: ComputedRef<number>;
   onFavoriteToggleError?: (error: unknown, song: MediaItem) => void;
 }
 
@@ -23,6 +24,7 @@ export const usePlaybackControls = (
   let volumePopoverListenerAttached = false;
 
   const volumePercent = computed(() => Math.round(playerStore.volume * 100));
+  const favoriteShuffleWeight = computed(() => Math.max(1, options.favoriteShuffleWeight?.value ?? 1));
   const currentSongIsFavorite = computed(() => (
     playerStore.currentMedia ? playlistStore.isFavoriteSong(playerStore.currentMedia) : false
   ));
@@ -32,8 +34,10 @@ export const usePlaybackControls = (
     await playerStore.play(song);
   };
 
-  const shuffleIds = (ids: string[]) => {
-    const next = [...ids];
+  const songKey = (song: Pick<MediaItem, 'sourceId' | 'id'>) => playlistStore.favoriteKey(song);
+
+  const shuffleItems = <T>(items: T[]) => {
+    const next = [...items];
     for (let i = next.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1));
       [next[i], next[j]] = [next[j], next[i]];
@@ -41,20 +45,41 @@ export const usePlaybackControls = (
     return next;
   };
 
-  const rebuildShuffleQueue = (excludeId?: string | null) => {
-    shuffleQueue.value = shuffleIds(
+  const weightedShuffleSongs = (items: MediaItem[]) => {
+    if (favoriteShuffleWeight.value <= 1) return shuffleItems(items).map(songKey);
+
+    const pool = [...items];
+    const next: string[] = [];
+
+    while (pool.length) {
+      const totalWeight = pool.reduce((total, song) => (
+        total + (playlistStore.isFavoriteSong(song) ? favoriteShuffleWeight.value : 1)
+      ), 0);
+      let cursor = Math.random() * totalWeight;
+      const selectedIndex = pool.findIndex(song => {
+        cursor -= playlistStore.isFavoriteSong(song) ? favoriteShuffleWeight.value : 1;
+        return cursor <= 0;
+      });
+      const [selectedSong] = pool.splice(selectedIndex >= 0 ? selectedIndex : pool.length - 1, 1);
+      next.push(songKey(selectedSong));
+    }
+
+    return next;
+  };
+
+  const rebuildShuffleQueue = (excludeKey?: string | null) => {
+    shuffleQueue.value = weightedShuffleSongs(
       songs.value
-        .map(song => song.id)
-        .filter(id => id !== excludeId),
+        .filter(song => songKey(song) !== excludeKey),
     );
   };
 
-  const removeFromShuffleQueue = (songId: string) => {
-    shuffleQueue.value = shuffleQueue.value.filter(id => id !== songId);
+  const removeFromShuffleQueue = (key: string) => {
+    shuffleQueue.value = shuffleQueue.value.filter(item => item !== key);
   };
 
   const playSong = (song: MediaItem) => {
-    removeFromShuffleQueue(song.id);
+    removeFromShuffleQueue(songKey(song));
     void playMedia(song);
   };
 
@@ -71,14 +96,14 @@ export const usePlaybackControls = (
   };
 
   const takeNextShuffleSong = (allowRebuild: boolean) => {
-    const currentId = playerStore.currentMedia?.id ?? null;
+    const currentId = playerStore.currentMedia ? songKey(playerStore.currentMedia) : null;
 
     if (!shuffleQueue.value.length && allowRebuild) {
       rebuildShuffleQueue(currentId);
     }
 
     const nextId = shuffleQueue.value.shift();
-    return songs.value.find(song => song.id === nextId) ?? null;
+    return songs.value.find(song => songKey(song) === nextId) ?? null;
   };
 
   const getInitialSong = () => {
@@ -161,7 +186,7 @@ export const usePlaybackControls = (
     shuffleEnabled.value = !shuffleEnabled.value;
 
     if (shuffleEnabled.value) {
-      rebuildShuffleQueue(playerStore.currentMedia?.id);
+      rebuildShuffleQueue(playerStore.currentMedia ? songKey(playerStore.currentMedia) : null);
     } else {
       shuffleQueue.value = [];
     }

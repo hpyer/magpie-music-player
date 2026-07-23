@@ -81,6 +81,7 @@ export const themeOptions: ThemeOption[] = [
 
 export const settingsTabs: Array<{ value: SettingsTab; label: string }> = [
   { value: 'theme', label: '主题' },
+  { value: 'playback', label: '播放' },
   { value: 'plugins', label: '插件' },
   { value: 'shortcuts', label: '快捷键' },
   { value: 'cache', label: '缓存' },
@@ -91,6 +92,7 @@ export const pluginCapabilityGroups: Array<{ label: string; capabilities: Plugin
   { label: '远程歌单', capabilities: ['playlist-source'] },
   { label: '媒体歌词', capabilities: ['media-lyrics'] },
   { label: '媒体封面', capabilities: ['media-cover'] },
+  { label: '收藏同步', capabilities: ['media-favorite'] },
   { label: '歌词搜索', capabilities: ['lyrics-search'] },
   { label: '歌曲信息搜索', capabilities: ['song-info-search'] },
   { label: '歌曲搜索', capabilities: ['search', 'music-search'] },

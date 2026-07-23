@@ -227,6 +227,7 @@ const {
   toggleVolumePopover,
   volumePercent,
 } = usePlaybackControls(songs, currentSongIndex, {
+  favoriteShuffleWeight: computed(() => settingsStore.settings.playback.favoriteShuffleWeight),
   onFavoriteToggleError: error => {
     showToast(`同步收藏失败: ${String(error)}`, { title: '收藏', kind: 'error' });
   },
@@ -1074,7 +1075,7 @@ const restorePlaybackSession = async (session: PlaybackSession) => {
   }
 
   if (shuffleEnabled.value) {
-    rebuildShuffleQueue(song.id);
+    rebuildShuffleQueue(playlistStore.favoriteKey(song));
   }
 
   playbackShouldResume.value = false;
@@ -2438,6 +2439,12 @@ const updateCacheGroupLimit = (groupId: CacheGroupId, event: Event) => {
   settingsDraft.value.cache[groupId].limitGb = normalizedValue;
 };
 
+const updateFavoriteShuffleWeight = (event: Event) => {
+  const target = event.target as HTMLSelectElement | null;
+  const nextValue = Number(target?.value);
+  settingsDraft.value.playback.favoriteShuffleWeight = Number.isFinite(nextValue) ? nextValue : 1;
+};
+
 const updateCacheSourceAllowed = (sourceId: string, allowed: boolean) => {
   const plugin = settingsDraft.value.plugins.find(item => item.id === sourceId);
   if (!plugin || !isCacheSourceConfigurable(plugin)) return;
@@ -2924,6 +2931,7 @@ const submitPlaylistForm = async () => {
       @toggle-plugin-expanded="togglePluginExpanded"
       @update-cache-group-limit="updateCacheGroupLimit"
       @update-cache-source-allowed="updateCacheSourceAllowed"
+      @update-favorite-shuffle-weight="updateFavoriteShuffleWeight"
       @update-plugin-config-boolean="updatePluginConfigFromBoolean"
       @update-plugin-config-input="updatePluginConfigFromInput"
       @update-plugin-enabled="updatePluginEnabled"

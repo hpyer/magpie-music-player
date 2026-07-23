@@ -91,10 +91,15 @@ export interface CacheSettings {
   allowedSourceIds: string[];
 }
 
+export interface PlaybackSettings {
+  favoriteShuffleWeight: number;
+}
+
 export interface AppSettings {
   themeId: ThemeId;
   shortcutsEnabled: boolean;
   shortcuts: ShortcutSetting[];
+  playback: PlaybackSettings;
   cache: CacheSettings;
   pluginBlocklist: PluginBlocklistSettings;
   plugins: InstalledPluginSetting[];
@@ -117,6 +122,9 @@ export const createDefaultAppSettings = (): AppSettings => ({
   themeId: 'sunset',
   shortcutsEnabled: false,
   shortcuts: defaultShortcuts(),
+  playback: {
+    favoriteShuffleWeight: 1,
+  },
   cache: {
     songs: { dir: '', limitGb: 1 },
     covers: { dir: '', limitGb: 0.5 },
@@ -151,6 +159,13 @@ const normalizeAllowedSourceIds = (sourceIds: unknown): string[] => {
       .map(value => value.trim())
       .filter(value => !officialCacheAllowedSourceIds.includes(value)),
   ));
+};
+
+const normalizeFavoriteShuffleWeight = (value: unknown, fallback: number) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return fallback;
+  if (![1, 1.5, 2, 3].includes(numericValue)) return fallback;
+  return numericValue;
 };
 
 const normalizeConfigSchema = (schema: unknown): PluginConfigField[] | undefined => {
@@ -227,6 +242,12 @@ const normalizeSettings = (settings: Partial<AppSettings>): AppSettings => {
       ...shortcut,
       keys: shortcutsById.get(shortcut.id)?.keys || shortcut.keys,
     })),
+    playback: {
+      favoriteShuffleWeight: normalizeFavoriteShuffleWeight(
+        settings.playback?.favoriteShuffleWeight,
+        fallback.playback.favoriteShuffleWeight,
+      ),
+    },
     cache: {
       songs: normalizeCachePathSetting(settings.cache?.songs, fallback.cache.songs),
       covers: normalizeCachePathSetting(settings.cache?.covers, fallback.cache.covers),
