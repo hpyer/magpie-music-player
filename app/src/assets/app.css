@@ -779,6 +779,7 @@ html[data-platform="windows"] .search-plugin-layout {
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: 1fr 34px 34px;
+  align-items: center;
   gap: 6px;
   padding: 8px;
   background: var(--theme-panel-header);
@@ -905,7 +906,11 @@ html[data-platform="windows"] .scan-overlay span {
   height: 34px;
   display: grid;
   place-items: center;
+  align-self: center;
+  justify-self: center;
   border-radius: 50%;
+  padding: 0;
+  line-height: 0;
 }
 
 .panel-icon-btn:disabled {
