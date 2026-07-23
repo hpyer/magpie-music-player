@@ -2713,7 +2713,7 @@ const submitPlaylistForm = async () => {
     :displayed-duration="displayedDuration"
     :edit-icon="editIcon"
     :expanded-panel="expandedPanel"
-    :favorite-song-ids="playlistStore.favoriteSongIds"
+    :favorite-song-keys="playlistStore.favoriteSongKeys"
     :heart-icon="heartIcon"
     :heart-outline-icon="heartOutlineIcon"
     :is-caching-network-song-id="isCachingNetworkSongId"

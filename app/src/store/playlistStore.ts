@@ -16,11 +16,23 @@ interface PlaylistStateFile {
   playlists?: Playlist[];
   currentPlaylistId?: string | null;
   localMusicDir?: string | null;
+  favoriteSongs?: Record<string, FavoriteSongState>;
   favoriteSongIds?: string[];
 }
 
 interface PlaylistSaveOptions {
   throwOnError?: boolean;
+}
+
+export interface FavoriteSongState {
+  sourceId: string;
+  mediaId: string;
+  title: string;
+  artist: string;
+  album?: string;
+  duration?: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 const PLAYLIST_STATE_PATH = storagePath('library', 'playlist-state.json');
@@ -94,6 +106,39 @@ const clearLegacyPlaylistState = () => {
   }
 };
 
+const favoriteSongKey = (song: Pick<MediaItem, 'sourceId' | 'id'>) => `${song.sourceId}:${song.id}`;
+
+const favoriteSongSnapshot = (song: MediaItem, existing?: FavoriteSongState): FavoriteSongState => {
+  const now = Date.now();
+  return {
+    sourceId: song.sourceId,
+    mediaId: song.id,
+    title: song.title,
+    artist: song.artist,
+    album: song.album,
+    duration: song.duration,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+};
+
+const migrateLegacyFavorites = (playlists: Playlist[], favoriteSongIds: string[] = []) => {
+  const legacyIds = new Set(favoriteSongIds);
+  if (!legacyIds.size) return {};
+
+  return playlists
+    .flatMap(playlist => playlist.songs)
+    .filter(song => legacyIds.has(song.id))
+    .reduce<Record<string, FavoriteSongState>>((favorites, song) => {
+      favorites[favoriteSongKey(song)] = favoriteSongSnapshot(song, favorites[favoriteSongKey(song)]);
+      return favorites;
+    }, {});
+};
+
+const hasSongReference = (playlists: Playlist[], key: string) => (
+  playlists.some(playlist => playlist.songs.some(song => favoriteSongKey(song) === key))
+);
+
 export const usePlaylistStore = defineStore('playlist', {
   state: () => ({
     playlists: [] as Playlist[],
@@ -101,10 +146,11 @@ export const usePlaylistStore = defineStore('playlist', {
     localMusicDir: null as string | null,
     isInitialized: false,
     hasLoaded: false,
-    favoriteSongIds: [] as string[],
+    favoriteSongs: {} as Record<string, FavoriteSongState>,
   }),
   getters: {
     currentPlaylist: (state) => state.playlists.find(p => p.id === state.currentPlaylistId) || null,
+    favoriteSongKeys: (state) => Object.keys(state.favoriteSongs),
   },
   actions: {
     async initialize(options: { hydrateMediaAssets?: boolean } = {}) {
@@ -122,10 +168,6 @@ export const usePlaylistStore = defineStore('playlist', {
             ...playlist,
             localDir: playlist.localDir ?? savedDir ?? undefined,
           }));
-        }
-
-        if (savedState.favoriteSongIds) {
-          this.favoriteSongIds = savedState.favoriteSongIds;
         }
 
         if (savedDir) {
@@ -154,6 +196,7 @@ export const usePlaylistStore = defineStore('playlist', {
 
         this.isInitialized = Boolean(this.localMusicDir || this.playlists.length);
         this.hasLoaded = true;
+        this.favoriteSongs = savedState.favoriteSongs ?? migrateLegacyFavorites(this.playlists, savedState.favoriteSongIds);
 
         if (shouldHydrateMediaAssets && this.playlists.length) {
           await this.hydrateMediaAssets();
@@ -302,7 +345,12 @@ export const usePlaylistStore = defineStore('playlist', {
       if (playlist) {
         const removedSongs = playlist.songs.filter(song => song.id === songId);
         playlist.songs = playlist.songs.filter(s => s.id !== songId);
-        this.favoriteSongIds = this.favoriteSongIds.filter(id => id !== songId);
+        removedSongs.forEach(song => {
+          const key = favoriteSongKey(song);
+          if (!hasSongReference(this.playlists, key)) {
+            delete this.favoriteSongs[key];
+          }
+        });
         await Promise.allSettled(removedSongs.map(deleteMediaAssets));
         await this.save({ throwOnError: true });
       }
@@ -331,17 +379,26 @@ export const usePlaylistStore = defineStore('playlist', {
       await this.save({ throwOnError: true });
     },
 
-    isFavoriteSong(songId: string) {
-      return this.favoriteSongIds.includes(songId);
+    favoriteKey(song: Pick<MediaItem, 'sourceId' | 'id'>) {
+      return favoriteSongKey(song);
     },
 
-    async toggleFavoriteSong(songId: string) {
-      if (this.isFavoriteSong(songId)) {
-        this.favoriteSongIds = this.favoriteSongIds.filter(id => id !== songId);
+    isFavoriteSong(song: Pick<MediaItem, 'sourceId' | 'id'>) {
+      return Boolean(this.favoriteSongs[favoriteSongKey(song)]);
+    },
+
+    async setFavoriteSong(song: MediaItem, favorite: boolean) {
+      const key = favoriteSongKey(song);
+      if (favorite) {
+        this.favoriteSongs[key] = favoriteSongSnapshot(song, this.favoriteSongs[key]);
       } else {
-        this.favoriteSongIds.push(songId);
+        delete this.favoriteSongs[key];
       }
       await this.save({ throwOnError: true });
+    },
+
+    async toggleFavoriteSong(song: MediaItem) {
+      await this.setFavoriteSong(song, !this.isFavoriteSong(song));
     },
 
     async updateSongLyric(songId: string, lyric: string, options: { cache?: boolean } = {}) {
@@ -388,8 +445,13 @@ export const usePlaylistStore = defineStore('playlist', {
       const playlist = this.playlists.find(p => p.id === id);
       if (playlist) {
         await Promise.all(playlist.songs.map(deleteMediaAssets));
-        const removedSongIds = new Set(playlist.songs.map(song => song.id));
-        this.favoriteSongIds = this.favoriteSongIds.filter(id => !removedSongIds.has(id));
+        const remainingPlaylists = this.playlists.filter(p => p.id !== id);
+        playlist.songs.forEach(song => {
+          const key = favoriteSongKey(song);
+          if (!hasSongReference(remainingPlaylists, key)) {
+            delete this.favoriteSongs[key];
+          }
+        });
       }
 
       this.playlists = this.playlists.filter(p => p.id !== id);
@@ -405,7 +467,7 @@ export const usePlaylistStore = defineStore('playlist', {
         playlists: persistedPlaylists,
         currentPlaylistId: this.currentPlaylistId,
         localMusicDir: this.localMusicDir,
-        favoriteSongIds: this.favoriteSongIds,
+        favoriteSongs: this.favoriteSongs,
       } satisfies PlaylistStateFile;
 
       playlistSaveQueue = playlistSaveQueue

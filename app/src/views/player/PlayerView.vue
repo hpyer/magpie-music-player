@@ -22,7 +22,7 @@ defineProps<{
   displayedDuration: number;
   editIcon: string;
   expandedPanel: PanelMode;
-  favoriteSongIds: string[];
+  favoriteSongKeys: string[];
   heartIcon: string;
   heartOutlineIcon: string;
   isCachingNetworkSongId: string | null;
@@ -236,7 +236,7 @@ const formatTime = (seconds?: number) => {
             :current-media-id="playerCurrentMedia?.id"
             :current-playlist-id="currentPlaylistId"
             :edit-icon="editIcon"
-            :favorite-song-ids="favoriteSongIds"
+            :favorite-song-keys="favoriteSongKeys"
             :heart-icon="heartIcon"
             :heart-outline-icon="heartOutlineIcon"
             :is-scanning="isScanning"

@@ -19,7 +19,7 @@ export const usePlaybackControls = (
 
   const volumePercent = computed(() => Math.round(playerStore.volume * 100));
   const currentSongIsFavorite = computed(() => (
-    playerStore.currentMedia ? playlistStore.isFavoriteSong(playerStore.currentMedia.id) : false
+    playerStore.currentMedia ? playlistStore.isFavoriteSong(playerStore.currentMedia) : false
   ));
 
   const playMedia = async (song: MediaItem) => {
@@ -54,7 +54,7 @@ export const usePlaybackControls = (
   };
 
   const toggleSongFavorite = (song: MediaItem) => {
-    void playlistStore.toggleFavoriteSong(song.id);
+    void playlistStore.toggleFavoriteSong(song);
   };
 
   const toggleCurrentFavorite = () => {

@@ -7,7 +7,7 @@ const props = defineProps<{
   currentMediaId?: string;
   currentPlaylistId: string | null;
   editIcon: string;
-  favoriteSongIds: string[];
+  favoriteSongKeys: string[];
   heartIcon: string;
   heartOutlineIcon: string;
   isScanning: boolean;
@@ -42,7 +42,8 @@ const songInitial = (song: MediaItem) => {
   return (song.title || song.artist || '?').trim().charAt(0).toUpperCase() || '?';
 };
 
-const isFavoriteSong = (songId: string) => props.favoriteSongIds.includes(songId);
+const favoriteSongKey = (song: MediaItem) => `${song.sourceId}:${song.id}`;
+const isFavoriteSong = (song: MediaItem) => props.favoriteSongKeys.includes(favoriteSongKey(song));
 </script>
 
 <template>
@@ -98,11 +99,11 @@ const isFavoriteSong = (songId: string) => props.favoriteSongIds.includes(songId
           </span>
           <button
             class="row-icon-btn"
-            :title="isFavoriteSong(song.id) ? '取消收藏' : '收藏'"
-            :aria-label="isFavoriteSong(song.id) ? '取消收藏' : '收藏'"
+            :title="isFavoriteSong(song) ? '取消收藏' : '收藏'"
+            :aria-label="isFavoriteSong(song) ? '取消收藏' : '收藏'"
             @click.stop="$emit('toggle-song-favorite', song)"
           >
-            <img class="svg-icon" :src="isFavoriteSong(song.id) ? heartIcon : heartOutlineIcon" alt="" aria-hidden="true">
+            <img class="svg-icon" :src="isFavoriteSong(song) ? heartIcon : heartOutlineIcon" alt="" aria-hidden="true">
           </button>
           <span class="song-duration">{{ formatTime(song.duration) }}</span>
           <button
