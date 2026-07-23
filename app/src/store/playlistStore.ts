@@ -31,10 +31,12 @@ export interface FavoriteSongState {
   artist: string;
   album?: string;
   duration?: number;
+  media?: MediaItem;
   createdAt: number;
   updatedAt: number;
 }
 
+export const FAVORITES_PLAYLIST_ID = 'virtual:favorites';
 const PLAYLIST_STATE_PATH = storagePath('library', 'playlist-state.json');
 const LEGACY_PLAYLIST_STORAGE_KEY = 'magpie_playlists_v1';
 const LEGACY_FAVORITES_STORAGE_KEY = 'magpie_favorite_song_ids_v1';
@@ -117,6 +119,7 @@ const favoriteSongSnapshot = (song: MediaItem, existing?: FavoriteSongState): Fa
     artist: song.artist,
     album: song.album,
     duration: song.duration,
+    media: toPersistedSong(song),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -141,6 +144,32 @@ const hasSongReference = (playlists: Playlist[], key: string) => (
 
 const isRemoteFavorite = (song: MediaItem) => song.extra?.remoteFavorite === true;
 
+const songFromFavoriteState = (favorite: FavoriteSongState): MediaItem => ({
+  id: favorite.mediaId,
+  sourceId: favorite.sourceId,
+  title: favorite.title,
+  artist: favorite.artist,
+  album: favorite.album,
+  duration: favorite.duration,
+  ...favorite.media,
+});
+
+const buildFavoritePlaylist = (
+  playlists: Playlist[],
+  favoriteSongs: Record<string, FavoriteSongState>,
+): Playlist => {
+  const latestSongs = new Map(
+    playlists.flatMap(playlist => playlist.songs).map(song => [favoriteSongKey(song), song]),
+  );
+
+  return {
+    id: FAVORITES_PLAYLIST_ID,
+    name: '我的收藏',
+    songs: Object.entries(favoriteSongs).map(([key, favorite]) => latestSongs.get(key) ?? songFromFavoriteState(favorite)),
+    createdAt: 0,
+  };
+};
+
 export const usePlaylistStore = defineStore('playlist', {
   state: () => ({
     playlists: [] as Playlist[],
@@ -151,7 +180,12 @@ export const usePlaylistStore = defineStore('playlist', {
     favoriteSongs: {} as Record<string, FavoriteSongState>,
   }),
   getters: {
-    currentPlaylist: (state) => state.playlists.find(p => p.id === state.currentPlaylistId) || null,
+    favoritePlaylist: (state) => buildFavoritePlaylist(state.playlists, state.favoriteSongs),
+    currentPlaylist: (state) => (
+      state.currentPlaylistId === FAVORITES_PLAYLIST_ID
+        ? buildFavoritePlaylist(state.playlists, state.favoriteSongs)
+        : state.playlists.find(p => p.id === state.currentPlaylistId) || null
+    ),
     favoriteSongKeys: (state) => Object.keys(state.favoriteSongs),
   },
   actions: {
@@ -190,15 +224,22 @@ export const usePlaylistStore = defineStore('playlist', {
           this.playlists.push(newPlaylist);
         }
 
-        if (savedState.currentPlaylistId && this.playlists.some(playlist => playlist.id === savedState.currentPlaylistId)) {
+        this.favoriteSongs = savedState.favoriteSongs ?? migrateLegacyFavorites(this.playlists, savedState.favoriteSongIds);
+
+        if (
+          savedState.currentPlaylistId
+          && (
+            savedState.currentPlaylistId === FAVORITES_PLAYLIST_ID
+            || this.playlists.some(playlist => playlist.id === savedState.currentPlaylistId)
+          )
+        ) {
           this.currentPlaylistId = savedState.currentPlaylistId;
         } else if (!this.currentPlaylistId && this.playlists.length > 0) {
           this.currentPlaylistId = this.playlists[0].id;
         }
 
-        this.isInitialized = Boolean(this.localMusicDir || this.playlists.length);
+        this.isInitialized = Boolean(this.localMusicDir || this.playlists.length || Object.keys(this.favoriteSongs).length);
         this.hasLoaded = true;
-        this.favoriteSongs = savedState.favoriteSongs ?? migrateLegacyFavorites(this.playlists, savedState.favoriteSongIds);
 
         if (shouldHydrateMediaAssets && this.playlists.length) {
           await this.hydrateMediaAssets();

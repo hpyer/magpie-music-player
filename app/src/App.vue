@@ -35,7 +35,7 @@ import { readPlaybackSession, writePlaybackSession, type PlaybackSession } from 
 import { AppSettings, InstalledPluginSetting, ShortcutSetting, createDefaultAppSettings, useAppSettingsStore } from './store/appSettingsStore';
 import { configureMediaAssetCache, loadMediaAssets } from './store/mediaAssetCache';
 import { usePlayerStore } from './store/playerStore';
-import { usePlaylistStore } from './store/playlistStore';
+import { FAVORITES_PLAYLIST_ID, usePlaylistStore } from './store/playlistStore';
 import { LyricSearchResult, MediaItem, Playlist, PlaylistType, PluginConfigField, PluginPlaylistItem, SongInfoSearchResult } from './types/plugin';
 import type {
   CacheFileEntry,
@@ -185,9 +185,23 @@ type IdleSchedulerWindow = Window & {
 
 const currentPlaylist = computed(() => playlistStore.currentPlaylist);
 const songs = computed(() => currentPlaylist.value?.songs ?? []);
+const currentPlaylistIsFavorites = computed(() => playlistStore.currentPlaylistId === FAVORITES_PLAYLIST_ID);
+const currentMediaKey = computed(() => (
+  playerStore.currentMedia ? playlistStore.favoriteKey(playerStore.currentMedia) : ''
+));
+const canEditCurrentPlaylist = computed(() => Boolean(
+  currentPlaylist.value && !currentPlaylistIsFavorites.value,
+));
+const playlistHasScanSource = computed(() => Boolean(
+  !currentPlaylistIsFavorites.value
+  && (currentPlaylist.value?.localDir || playlistStore.localMusicDir),
+));
 const currentSongIndex = computed(() => {
   if (!playerStore.currentMedia) return -1;
-  return songs.value.findIndex(song => song.id === playerStore.currentMedia?.id);
+  return songs.value.findIndex(song => (
+    song.id === playerStore.currentMedia?.id
+    && song.sourceId === playerStore.currentMedia?.sourceId
+  ));
 });
 const {
   clearShuffleQueue,
@@ -300,7 +314,10 @@ const isPlaylistSelectable = (playlist: Playlist) => (
   playlist.type !== 'plugin-playlist'
   || Boolean(playlist.pluginPlaylist?.pluginId && enabledPluginIds.value.has(playlist.pluginPlaylist.pluginId))
 );
-const selectablePlaylists = computed(() => playlistStore.playlists.filter(isPlaylistSelectable));
+const selectablePlaylists = computed(() => [
+  playlistStore.favoritePlaylist,
+  ...playlistStore.playlists.filter(isPlaylistSelectable),
+]);
 const playlistSelectOptions = computed<AppSelectOption[]>(() => selectablePlaylists.value.map(playlist => ({
   value: playlist.id,
   label: playlist.name,
@@ -670,7 +687,9 @@ watch([() => playlistStore.currentPlaylistId, selectablePlaylists], () => {
   const currentPlaylist = playlistStore.currentPlaylist;
   if (!currentPlaylist || isPlaylistSelectable(currentPlaylist)) return;
 
-  const nextPlaylist = selectablePlaylists.value[0] ?? null;
+  const nextPlaylist = selectablePlaylists.value.find(playlist => playlist.id !== FAVORITES_PLAYLIST_ID)
+    ?? selectablePlaylists.value[0]
+    ?? null;
   playlistStore.currentPlaylistId = nextPlaylist?.id ?? null;
   clearShuffleQueue();
   playbackShouldResume.value = false;
@@ -1018,9 +1037,7 @@ const restorePlaybackSession = async (session: PlaybackSession) => {
     wasPlaying: session.wasPlaying,
   });
 
-  if (session.currentPlaylistId && playlistStore.playlists.some(playlist => (
-    playlist.id === session.currentPlaylistId && isPlaylistSelectable(playlist)
-  ))) {
+  if (session.currentPlaylistId && selectablePlaylists.value.some(playlist => playlist.id === session.currentPlaylistId)) {
     playlistStore.currentPlaylistId = session.currentPlaylistId;
   }
 
@@ -1354,8 +1371,8 @@ const scanCurrentPlaylist = async () => {
 };
 
 const switchPlaylist = (playlistId: string) => {
-  const playlist = playlistStore.playlists.find(item => item.id === playlistId);
-  if (!playlist || !isPlaylistSelectable(playlist)) return;
+  const playlist = selectablePlaylists.value.find(item => item.id === playlistId);
+  if (!playlist) return;
 
   playlistStore.currentPlaylistId = playlistId;
   clearShuffleQueue();
@@ -1401,6 +1418,29 @@ const deleteRemoteSongFile = async (playlist: NonNullable<typeof currentPlaylist
 const removeSongFromCurrentPlaylist = async (song: MediaItem) => {
   const playlist = currentPlaylist.value;
   if (!playlist) return;
+
+  if (playlist.id === FAVORITES_PLAYLIST_ID) {
+    const shouldRemove = await requestConfirm({
+      title: '移除收藏',
+      message: `确定要取消收藏“${song.title}”吗？`,
+      confirmText: '取消收藏',
+      kind: 'danger',
+    });
+    if (!shouldRemove) return;
+
+    const songIndex = playlist.songs.findIndex(item => item.id === song.id && item.sourceId === song.sourceId);
+    const nextSong = playlist.songs[songIndex + 1] ?? playlist.songs[songIndex - 1] ?? null;
+    try {
+      await playlistStore.toggleFavoriteSong(song);
+      if (playerStore.currentMedia?.id === song.id && playerStore.currentMedia.sourceId === song.sourceId) {
+        playerStore.select(nextSong);
+      }
+      showToast('已取消收藏。', { title: '收藏', kind: 'success' });
+    } catch (error) {
+      showToast(`取消收藏失败: ${String(error)}`, { title: '收藏', kind: 'error' });
+    }
+    return;
+  }
 
   const isRemotePlaylist = playlist.type === 'plugin-playlist';
   const decision = await requestConfirmWithOption({
@@ -1515,6 +1555,8 @@ const openCreatePlaylistModal = async () => {
 
 const openEditPlaylistModal = async () => {
   refreshPluginCapabilities();
+  if (currentPlaylistIsFavorites.value) return;
+
   const playlist = playlistStore.currentPlaylist;
   if (!playlist) return;
   const pluginType = playlist.pluginPlaylist?.pluginId
@@ -2710,6 +2752,8 @@ const submitPlaylistForm = async () => {
     :close-icon="closeIcon"
     :cache-progress-percent="cacheProgressPercent"
     :cache-track-state="cacheTrackState"
+    :can-edit-current-playlist="canEditCurrentPlaylist"
+    :current-media-key="currentMediaKey"
     :current-playlist-id="playlistStore.currentPlaylistId"
     :current-song="currentSong"
     :current-song-is-favorite="currentSongIsFavorite"
@@ -2738,7 +2782,7 @@ const submitPlaylistForm = async () => {
     :player-current-media="playerStore.currentMedia"
     :player-is-playing="playerStore.isPlaying"
     :player-volume="playerStore.volume"
-    :playlist-has-scan-source="Boolean(playlistStore.currentPlaylist?.localDir || playlistStore.localMusicDir)"
+    :playlist-has-scan-source="playlistHasScanSource"
     :playlist-icon="playlistIcon"
     :playlist-select-options="playlistSelectOptions"
     :previous-icon="previousIcon"

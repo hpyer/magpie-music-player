@@ -4,7 +4,8 @@ import type { MediaItem } from '../../../types/plugin';
 
 const props = defineProps<{
   addIcon: string;
-  currentMediaId?: string;
+  canEditCurrentPlaylist: boolean;
+  currentMediaKey: string;
   currentPlaylistId: string | null;
   editIcon: string;
   favoriteSongKeys: string[];
@@ -59,7 +60,7 @@ const isFavoriteSong = (song: MediaItem) => props.favoriteSongKeys.includes(favo
       <button class="panel-icon-btn" title="新建播放列表" aria-label="新建播放列表" @click="$emit('create-playlist')">
         <img class="svg-icon" :src="addIcon" alt="" aria-hidden="true">
       </button>
-      <button class="panel-icon-btn" title="编辑播放列表" aria-label="编辑播放列表" @click="$emit('edit-playlist')">
+      <button class="panel-icon-btn" title="编辑播放列表" aria-label="编辑播放列表" :disabled="!canEditCurrentPlaylist" @click="$emit('edit-playlist')">
         <img class="svg-icon" :src="editIcon" alt="" aria-hidden="true">
       </button>
     </div>
@@ -72,10 +73,10 @@ const isFavoriteSong = (song: MediaItem) => props.favoriteSongKeys.includes(favo
       <div v-if="songs.length" class="song-list">
         <div
           v-for="(song, index) in songs"
-          :key="song.id"
+          :key="favoriteSongKey(song)"
           :data-song-id="song.id"
           class="song-row"
-          :class="{ active: currentMediaId === song.id }"
+          :class="{ active: currentMediaKey === favoriteSongKey(song) }"
           @dblclick="$emit('play-song', song)"
         >
           <span class="song-index">{{ index + 1 }}</span>

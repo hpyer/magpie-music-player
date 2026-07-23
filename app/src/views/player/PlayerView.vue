@@ -15,7 +15,9 @@ defineProps<{
   appName: string;
   cacheProgressPercent: number;
   cacheTrackState: 'default' | 'empty' | 'downloading' | 'complete';
+  canEditCurrentPlaylist: boolean;
   closeIcon: string;
+  currentMediaKey: string;
   currentSong: MediaItem | null;
   currentSongIsFavorite: boolean;
   displayedCurrentTime: number;
@@ -233,7 +235,8 @@ const formatTime = (seconds?: number) => {
           <PlaylistPanel
             v-else-if="expandedPanel === 'playlist'"
             :add-icon="addIcon"
-            :current-media-id="playerCurrentMedia?.id"
+            :can-edit-current-playlist="canEditCurrentPlaylist"
+            :current-media-key="currentMediaKey"
             :current-playlist-id="currentPlaylistId"
             :edit-icon="editIcon"
             :favorite-song-keys="favoriteSongKeys"
